@@ -1,0 +1,38 @@
+"""Fixture merchant's product list — food/mart items."""
+[
+  {
+    "id": "item_001",
+    "name": "Organic Almond Butter",
+    "price_paise": 45000,
+    "currency": "INR",
+    "description": "Creamy 500g jar, no added sugar"
+  },
+  {
+    "id": "item_002",
+    "name": "Sourdough Bread Loaf",
+    "price_paise": 18000,
+    "currency": "INR",
+    "description": "Freshly baked, 800g"
+  },
+  {
+    "id": "item_003",
+    "name": "Cold-Pressed Olive Oil",
+    "price_paise": 62000,
+    "currency": "INR",
+    "description": "Extra virgin, 1L bottle"
+  },
+  {
+    "id": "item_004",
+    "name": "Free-Range Eggs",
+    "price_paise": 9500,
+    "currency": "INR",
+    "description": "Pack of 12"
+  },
+  {
+    "id": "item_005",
+    "name": "Oat Milk",
+    "price_paise": 7800,
+    "currency": "INR",
+    "description": "Barista edition, 1L"
+  }
+]
