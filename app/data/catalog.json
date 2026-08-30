@@ -1,38 +1,72 @@
-"""Fixture merchant's product list — food/mart items."""
 [
   {
     "id": "item_001",
-    "name": "Organic Almond Butter",
-    "price_paise": 45000,
+    "name": "Chicken Biriyani",
+    "price_paise": 35000,
     "currency": "INR",
-    "description": "Creamy 500g jar, no added sugar"
+    "description": "Hyderabadi style, full portion with raita"
   },
   {
     "id": "item_002",
-    "name": "Sourdough Bread Loaf",
-    "price_paise": 18000,
+    "name": "Veg Thali",
+    "price_paise": 25000,
     "currency": "INR",
-    "description": "Freshly baked, 800g"
+    "description": "Paneer, dal, rice, roti, salad, gulab jamun"
   },
   {
     "id": "item_003",
-    "name": "Cold-Pressed Olive Oil",
-    "price_paise": 62000,
+    "name": "Masala Dosa",
+    "price_paise": 15000,
     "currency": "INR",
-    "description": "Extra virgin, 1L bottle"
+    "description": "Crispy dosa with potato filling, sambar, chutney"
   },
   {
     "id": "item_004",
-    "name": "Free-Range Eggs",
-    "price_paise": 9500,
+    "name": "Egg Fried Rice",
+    "price_paise": 18000,
     "currency": "INR",
-    "description": "Pack of 12"
+    "description": "Wok-tossed with vegetables and soy sauce"
   },
   {
     "id": "item_005",
-    "name": "Oat Milk",
-    "price_paise": 7800,
+    "name": "Paneer Tikka",
+    "price_paise": 28000,
     "currency": "INR",
-    "description": "Barista edition, 1L"
+    "description": "Grilled cottage cheese cubes with mint chutney"
+  },
+  {
+    "id": "item_006",
+    "name": "Butter Chicken",
+    "price_paise": 38000,
+    "currency": "INR",
+    "description": "Creamy tomato gravy, tender chicken, naan included"
+  },
+  {
+    "id": "item_007",
+    "name": "Idli Sambar",
+    "price_paise": 12000,
+    "currency": "INR",
+    "description": "4 soft idlis with sambar and coconut chutney"
+  },
+  {
+    "id": "item_008",
+    "name": "Mutton Biryani",
+    "price_paise": 45000,
+    "currency": "INR",
+    "description": "Lucknowi style, slow-cooked mutton, saffron rice"
+  },
+  {
+    "id": "item_009",
+    "name": "Chai + Samosa",
+    "price_paise": 8000,
+    "currency": "INR",
+    "description": "Masala chai with 2 vegetable samosas"
+  },
+  {
+    "id": "item_010",
+    "name": "Gulab Jamun (4 pcs)",
+    "price_paise": 10000,
+    "currency": "INR",
+    "description": "Warm milk-solid dumplings in cardamom syrup"
   }
 ]

@@ -1,0 +1,15 @@
+"""Merchant API routers — catalog, checkout, webhooks, audit, agent."""
+
+from .agent import router as agent_router
+from .audit import router as audit_router
+from .catalog import router as catalog_router
+from .checkout import router as checkout_router
+from .webhooks import router as webhooks_router
+
+__all__ = [
+    "agent_router",
+    "audit_router",
+    "catalog_router",
+    "checkout_router",
+    "webhooks_router",
+]
