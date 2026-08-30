@@ -48,5 +48,11 @@ class Settings(BaseSettings):
         description="Base URL of the merchant agent API",
     )
 
+    # Brave Search (for Phase 4B stretch agent)
+    brave_api_key: str = Field(
+        default="",
+        description="Brave Search API key for web search (free tier: 2000 queries/mo)",
+    )
+
 
 settings = Settings()

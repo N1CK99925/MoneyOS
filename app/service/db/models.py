@@ -1,4 +1,4 @@
-"""SQLAlchemy models — audit_log table definition."""
+"""SQLAlchemy models — audit_log and checkout_session tables."""
 
 from datetime import UTC, datetime
 
@@ -23,3 +23,17 @@ class AuditLog(Base):
     result: Mapped[str | None] = mapped_column(String(20), nullable=True)
     error_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     signed_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class CheckoutSession(Base):
+    __tablename__ = "checkout_session"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    razorpay_order_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    items: Mapped[str] = mapped_column(Text, nullable=False)  # JSON string
+    total_paise: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="INR")
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ready_for_payment")
+    buyer_agent_id: Mapped[str] = mapped_column(String(100), nullable=False, default="anonymous")
+    created_at: Mapped[str] = mapped_column(String(35), nullable=False)

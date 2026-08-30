@@ -6,7 +6,7 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 from service.db.connection import Base
-from service.db.models import AuditLog  # noqa: F401 — ensure models are loaded
+from service.db.models import AuditLog, CheckoutSession  # noqa: F401 — ensure models are loaded
 from service.settings import settings
 
 config = context.config

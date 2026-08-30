@@ -1,4 +1,4 @@
-"""POST /api/agent/run — SSE endpoint for the buyer agent."""
+"""POST /api/agent/run — SSE endpoint for the buyer agent (core + stretch)."""
 
 from __future__ import annotations
 
@@ -12,15 +12,20 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from buyer_agent.core.agent import run_buyer_agent
+from buyer_agent.stretch.agent import run_stretch_agent
 
 router = APIRouter(prefix="/api", tags=["agent"])
 
 
 class AgentRunRequest(BaseModel):
     goal: str = Field(..., description="Purchase goal, e.g. 'buy chicken biriyani under ₹500'")
+    stretch: bool = Field(
+        default=False,
+        description="Use stretch agent with web search + review scoring",
+    )
 
 
-def _sse_stream(goal: str) -> Any:
+def _sse_stream(goal: str, stretch: bool = False) -> Any:
     """Generator that yields SSE events from the buyer agent."""
     q: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue()
 
@@ -29,7 +34,8 @@ def _sse_stream(goal: str) -> Any:
 
     def run() -> None:
         try:
-            result = run_buyer_agent(goal, on_event=on_event)
+            agent_fn = run_stretch_agent if stretch else run_buyer_agent
+            result = agent_fn(goal, on_event=on_event)
             q.put(("done", {"result": result}))
         except Exception as e:
             q.put(("error", {"message": str(e)}))
@@ -56,4 +62,4 @@ async def run_agent(body: AgentRunRequest):
     if not body.goal.strip():
         raise HTTPException(status_code=400, detail="Goal cannot be empty")
 
-    return EventSourceResponse(_sse_stream(body.goal))
+    return EventSourceResponse(_sse_stream(body.goal, body.stretch))

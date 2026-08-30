@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -26,6 +27,11 @@ if settings.llm_api_key:
     os.environ.setdefault("OPENROUTER_API_KEY", settings.llm_api_key)
     os.environ.setdefault("GROQ_API_KEY", settings.llm_api_key)
     os.environ.setdefault("GEMINI_API_KEY", settings.llm_api_key)
+
+# Global rate-limit cooldown: timestamp after which we can retry
+_rate_limit_cooldown_until: float = 0.0
+_RATE_LIMIT_BACKOFF = 30  # seconds to wait after hitting rate limit
+_RETRY_DELAY = 3  # seconds between model retries
 
 _SYSTEM_PROMPT = """\
 You are an autonomous buyer agent. Your job is to find and purchase a product \
@@ -104,6 +110,8 @@ def run_buyer_agent(
     str
         The agent's final summary of what it did.
     """
+    global _rate_limit_cooldown_until
+
     models = _build_models()
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": _SYSTEM_PROMPT},
@@ -112,7 +120,20 @@ def run_buyer_agent(
 
     last_error: str | None = None
 
-    for model in models:
+    for i, model in enumerate(models):
+        # Respect rate-limit cooldown
+        now = time.time()
+        if now < _rate_limit_cooldown_until:
+            wait = _rate_limit_cooldown_until - now
+            logger.info("Rate-limit cooldown: waiting %.0fs", wait)
+            if on_event:
+                on_event("rate_limit_wait", {"seconds": int(wait)})
+            time.sleep(wait)
+
+        # Delay between model retries
+        if i > 0:
+            time.sleep(_RETRY_DELAY)
+
         logger.info("Trying model: %s", model)
         if on_event:
             on_event("model_switch", {"model": model})
@@ -121,6 +142,16 @@ def run_buyer_agent(
         except Exception as e:
             last_error = str(e)
             logger.warning("Model %s failed: %s", model, last_error)
+
+            # Detect rate limit errors — set cooldown
+            err_str = str(e).lower()
+            if "rate" in err_str and "limit" in err_str:
+                _rate_limit_cooldown_until = time.time() + _RATE_LIMIT_BACKOFF
+                logger.warning("Rate limited — cooling down for %ds", _RATE_LIMIT_BACKOFF)
+                if on_event:
+                    on_event("rate_limit_wait", {"seconds": _RATE_LIMIT_BACKOFF, "model": model})
+                continue
+
             if on_event:
                 on_event("model_error", {"model": model, "error": last_error})
             continue

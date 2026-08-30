@@ -2,6 +2,6 @@
 
 from .audit_writer import write_audit_row
 from .connection import Base, SessionLocal, get_db, init_db
-from .models import AuditLog
+from .models import AuditLog, CheckoutSession
 
-__all__ = ["AuditLog", "Base", "SessionLocal", "get_db", "init_db", "write_audit_row"]
+__all__ = ["AuditLog", "CheckoutSession", "Base", "SessionLocal", "get_db", "init_db", "write_audit_row"]

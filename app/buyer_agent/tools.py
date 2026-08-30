@@ -73,8 +73,8 @@ def create_checkout_session(items: list[dict[str, Any]], buyer_agent_id: str = "
 
 
 def complete_checkout(session_id: str) -> str:
-    """Complete payment for a checkout session."""
-    result = _post(f"/api/checkout_sessions/{session_id}/complete", {})
+    """Complete payment for a checkout session. Uses polling fallback if webhook is delayed."""
+    result = _post(f"/api/checkout_sessions/{session_id}/complete?poll=true", {})
     return json.dumps(result)
 
 

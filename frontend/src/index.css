@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Editorial Luxury palette ── */
+  --color-cream: #FDFBF7;
+  --color-cream-dark: #F5F0E8;
+  --color-parchment: #EDE8DD;
+  --color-ink: #1A1612;
+  --color-ink-soft: #3D3630;
+  --color-ink-muted: #8A7E72;
+  --color-sage: #17A66B;
+  --color-sage-light: #20A96A;
+  --color-sage-pale: #17A66B12;
+  --color-border-warm: #D8D0C4;
+  --color-border-faint: #E8E2D8;
+
+  /* ── Error tokens ── */
+  --color-error: #C53030;
+  --color-error-light: #FED7D7;
+  --color-error-surface: #FFF5F5;
+  --color-error-border: #FEB2B2;
+
+  /* ── Fonts ── */
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", Geist, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Geist Mono", monospace;
+
+  /* ── Easings ── */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Custom Tailwind utilities ── */
+@utility ease-spring {
+  transition-timing-function: var(--ease-spring);
+}
+@utility ease-out-expo {
+  transition-timing-function: var(--ease-out-expo);
+}
+
+@utility font-serif {
+  font-family: var(--font-serif);
+}
+@utility font-sans {
+  font-family: var(--font-sans);
+}
+@utility font-mono {
+  font-family: var(--font-mono);
+}
+
+@utility shadow-card {
+  box-shadow: 0 1px 3px rgba(26, 22, 18, 0.04), 0 8px 30px rgba(26, 22, 18, 0.06);
+}
+@utility shadow-card-hover {
+  box-shadow: 0 1px 3px rgba(26, 22, 18, 0.04), 0 12px 40px rgba(26, 22, 18, 0.08);
+}
+@utility shadow-nav {
+  box-shadow: 0 2px 20px rgba(26, 22, 18, 0.06);
+}
+@utility shadow-dropdown {
+  box-shadow: 0 16px 60px rgba(26, 22, 18, 0.1);
+}
+@utility shadow-floating-pill {
+  box-shadow: 0 8px 30px rgba(26, 22, 18, 0.15);
+}
+@utility shadow-floating-pill-hover {
+  box-shadow: 0 8px 40px rgba(26, 22, 18, 0.2);
+}
+@utility shadow-floating-panel {
+  box-shadow: 0 16px 60px rgba(26, 22, 18, 0.12);
+}
+@utility shadow-sage-glow {
+  box-shadow: 0 4px 20px rgba(23, 166, 107, 0.08);
+}
+@utility shadow-sage-glow-hover {
+  box-shadow: 0 4px 30px rgba(23, 166, 107, 0.12);
+}
+
+/* ── Grain overlay ── */
+@utility grain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+
+/* ── Scroll reveal animation keyframes ── */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Base styles ── */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background-color: rgba(23, 166, 107, 0.15);
+    color: var(--color-ink);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-cream-dark);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-warm);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-sage);
+  }
+}
+
+/* ── Scroll reveal utility ── */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  filter: blur(4px);
+  transition: opacity 800ms var(--ease-spring),
+              transform 800ms var(--ease-spring),
+              filter 800ms var(--ease-spring);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* ── Stagger children reveal ── */
+.stagger-children > .reveal:nth-child(1) { transition-delay: 0ms; }
+.stagger-children > .reveal:nth-child(2) { transition-delay: 80ms; }
+.stagger-children > .reveal:nth-child(3) { transition-delay: 160ms; }
+.stagger-children > .reveal:nth-child(4) { transition-delay: 240ms; }
+.stagger-children > .reveal:nth-child(5) { transition-delay: 320ms; }
+.stagger-children > .reveal:nth-child(6) { transition-delay: 400ms; }
+.stagger-children > .reveal:nth-child(7) { transition-delay: 480ms; }
+.stagger-children > .reveal:nth-child(8) { transition-delay: 560ms; }
+
+/* ── Double-bezel inset highlight ── */
+.inset-highlight {
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
