@@ -24,6 +24,7 @@
   --font-serif: "Playfair Display", Georgia, serif;
   --font-sans: "Plus Jakarta Sans", Geist, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "Geist Mono", monospace;
+  --font-display: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
 
   /* ── Easings ── */
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
@@ -46,6 +47,9 @@
 }
 @utility font-mono {
   font-family: var(--font-mono);
+}
+@utility font-display {
+  font-family: var(--font-display);
 }
 
 @utility shadow-card {
@@ -178,4 +182,121 @@
 /* ── Double-bezel inset highlight ── */
 .inset-highlight {
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+/* ── Hero accent glow ── */
+.hero-accent {
+  color: #B8E634;
+  text-shadow: 0 0 40px rgba(184, 230, 52, 0.4), 0 0 80px rgba(184, 230, 52, 0.15);
+}
+
+/* ── Glass Button ── */
+.glass-button-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glass-button {
+  position: relative;
+  z-index: 2;
+  background: var(--color-ink);
+  color: var(--color-cream);
+  border: none;
+  outline: none;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 500ms var(--ease-spring);
+}
+
+.glass-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0) 50%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  opacity: 0;
+  transition: opacity 500ms var(--ease-spring);
+}
+
+.glass-button:hover::before {
+  opacity: 1;
+}
+
+.glass-button:active {
+  transform: scale(0.97);
+}
+
+.glass-button-text {
+  position: relative;
+  z-index: 1;
+}
+
+.glass-button-shadow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--color-ink);
+  opacity: 0.3;
+  filter: blur(16px);
+  transform: translateY(6px);
+  transition: all 500ms var(--ease-spring);
+}
+
+.glass-button-wrap:hover .glass-button-shadow {
+  opacity: 0.45;
+  filter: blur(20px);
+  transform: translateY(8px);
+}
+
+/* ── Glass Button variants ── */
+.glass-button-wrap[data-variant="sage"] .glass-button {
+  background: var(--color-sage);
+}
+
+.glass-button-wrap[data-variant="sage"] .glass-button-shadow {
+  background: var(--color-sage);
+}
+
+.glass-button-wrap[data-variant="ghost"] .glass-button {
+  background: transparent;
+  color: var(--color-ink-muted);
+  box-shadow: inset 0 0 0 1px var(--color-border-warm);
+}
+
+.glass-button-wrap[data-variant="ghost"] .glass-button-shadow {
+  display: none;
+}
+
+.glass-button-wrap[data-variant="ghost"]:hover .glass-button {
+  background: var(--color-parchment);
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-border-warm);
+}
+
+.glass-button-wrap[data-variant="ghost"]:hover .glass-button-shadow {
+  display: block;
+  opacity: 0.1;
+  background: var(--color-ink);
+}
+
+/* ── Ghost hero variant — white text on shader backgrounds ── */
+.glass-button-wrap[data-variant="ghost-hero"] .glass-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  box-shadow: none;
+}
+.glass-button-wrap[data-variant="ghost-hero"]:hover .glass-button {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+.glass-button-wrap[data-variant="ghost-hero"] .glass-button-shadow {
+  display: none;
 }

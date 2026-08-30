@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { fetchCatalog, createCheckoutSession } from '../lib/api'
 import type { CatalogItem } from '../types'
 import { useGoal } from '../hooks'
+import { GlassButton } from '../components/ui/glass-button'
 
 const EASE: [number, number, number, number] = [0.32, 0.72, 0, 1]
 
@@ -85,13 +86,14 @@ export default function Catalog() {
         {/* ── Header ── */}
         <div className="mb-12">
           <span className="inline-flex items-center gap-2 rounded-full bg-parchment px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-medium text-ink-muted mb-5">
+            <ShoppingCart weight="light" className="w-3 h-3" />
             Marketplace
           </span>
           <h1 className="font-serif text-4xl md:text-5xl font-bold tracking-tight text-ink mb-3">
             Catalog
           </h1>
           <p className="text-base text-ink-muted">
-            {items.length} products available. Ask the agent to search, compare, or buy.
+            {items.length} products. Add to cart, or let the agent handle it.
           </p>
         </div>
 
@@ -146,39 +148,46 @@ export default function Catalog() {
                       <div className="flex items-center gap-2">
                         {qty > 0 ? (
                           <div className="flex items-center gap-1 rounded-full bg-parchment border border-border-faint px-1 py-1">
-                            <button
+                            <GlassButton
+                              size="icon"
+                              variant="ghost"
                               onClick={() => updateCart(item.id, -1)}
-                              className="w-7 h-7 rounded-full bg-white border border-border-faint flex items-center justify-center transition-all duration-300 ease-spring hover:bg-error-surface hover:border-error-border"
+                              className="!h-7 !w-7 !rounded-full"
                             >
                               {qty === 1 ? (
                                 <Trash weight="light" className="w-3 h-3 text-error" />
                               ) : (
                                 <Minus weight="light" className="w-3 h-3 text-ink-soft" />
                               )}
-                            </button>
+                            </GlassButton>
                             <span className="w-6 text-center font-mono text-xs font-medium text-ink">{qty}</span>
-                            <button
+                            <GlassButton
+                              size="icon"
+                              variant="ghost"
                               onClick={() => updateCart(item.id, 1)}
-                              className="w-7 h-7 rounded-full bg-white border border-border-faint flex items-center justify-center transition-all duration-300 ease-spring hover:bg-sage-pale hover:border-sage/20"
+                              className="!h-7 !w-7 !rounded-full"
                             >
                               <Plus weight="light" className="w-3 h-3 text-ink-soft" />
-                            </button>
+                            </GlassButton>
                           </div>
                         ) : (
-                          <button
+                          <GlassButton
+                            size="icon"
+                            variant="ghost"
                             onClick={() => updateCart(item.id, 1)}
-                            className="w-9 h-9 rounded-full bg-parchment/60 border border-border-faint flex items-center justify-center transition-all duration-500 ease-spring hover:bg-sage hover:border-sage text-ink-soft hover:text-cream active:scale-[0.95]"
+                            className="!h-9 !w-9 !rounded-full"
                           >
                             <Plus weight="light" className="w-4 h-4" />
-                          </button>
+                          </GlassButton>
                         )}
-                        <button
+                        <GlassButton
+                          size="icon"
                           onClick={() => handleAgentGoal(item)}
-                          className="w-9 h-9 rounded-full bg-parchment/60 border border-border-faint flex items-center justify-center transition-all duration-500 ease-spring hover:bg-ink hover:border-ink text-ink-soft hover:text-cream active:scale-[0.95]"
+                          className="!h-9 !w-9 !rounded-full"
                           title="Ask agent to buy this"
                         >
                           <ShoppingCart weight="light" className="w-4 h-4" />
-                        </button>
+                        </GlassButton>
                       </div>
                     </div>
                   </div>
@@ -210,12 +219,13 @@ export default function Catalog() {
                     </span>
                   </div>
                 </div>
-                <button
+                <GlassButton
+                  size="sm"
+                  variant="sage"
                   onClick={handleCheckout}
-                  className="rounded-full bg-sage text-cream px-5 py-2 text-sm font-medium transition-all duration-500 ease-spring hover:bg-sage-light active:scale-[0.97]"
                 >
                   Checkout
-                </button>
+                </GlassButton>
               </div>
             </motion.div>
           )}

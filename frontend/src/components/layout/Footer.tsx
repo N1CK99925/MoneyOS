@@ -11,7 +11,7 @@ export default function Footer() {
           <span className="font-serif text-sm font-semibold text-ink">MoneyOS</span>
         </div>
         <p className="text-xs text-ink-muted font-mono tracking-wider">
-          AI-Financial-OS • Buildathon 2026
+          Financial OS • Buildathon 2026
         </p>
       </div>
     </footer>

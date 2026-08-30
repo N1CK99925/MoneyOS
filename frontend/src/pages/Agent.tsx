@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { streamAgentRun } from '../lib/api'
 import type { AgentMessage } from '../types'
 import { useGoal, useScrollReveal } from '../hooks'
+import { GlassButton } from '../components/ui/glass-button'
 
 const EASE: [number, number, number, number] = [0.32, 0.72, 0, 1]
 
@@ -92,10 +93,10 @@ export default function Agent() {
         <div ref={headerRef} className="reveal mb-8 text-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-sage-pale px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-medium text-sage mb-5">
             <Lightning weight="fill" className="w-3 h-3" />
-            Agent Interface
+            Agent
           </span>
           <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight text-ink">
-            Financial Agent
+            Talk to MoneyOS
           </h1>
         </div>
 
@@ -107,7 +108,7 @@ export default function Agent() {
                 <Lightning weight="light" className="w-6 h-6 text-ink-muted" />
               </div>
               <p className="text-sm text-ink-muted mb-1">No messages yet.</p>
-              <p className="text-xs text-ink-muted/60">Type a goal below to get started.</p>
+              <p className="text-xs text-ink-muted/60">Tell the agent what you want to buy.</p>
             </div>
           )}
           <AnimatePresence initial={false}>
@@ -157,40 +158,39 @@ export default function Agent() {
                     handleSubmit(e)
                   }
                 }}
-                placeholder="Ask the agent to do something..."
+                placeholder="What do you want to buy?"
                 rows={1}
                 className="flex-1 bg-transparent px-5 py-4 text-sm text-ink placeholder:text-ink-muted outline-none resize-none min-h-[48px] max-h-[120px]"
                 style={{ height: 'auto' }}
               />
               <div className="flex items-center gap-2 pr-3 pb-3">
-                <button
+                <GlassButton
+                  size="sm"
+                  variant={isStretch ? "sage" : "ghost"}
                   type="button"
                   onClick={() => setIsStretch(!isStretch)}
-                  className={`rounded-full px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium border transition-all duration-500 ease-spring ${
-                    isStretch
-                      ? 'bg-sage-pale border-sage/20 text-sage'
-                      : 'bg-parchment/50 border-border-faint text-ink-muted hover:bg-parchment'
-                  }`}
                   title={isStretch ? 'Research mode ON' : 'Research mode OFF'}
                 >
                   {isStretch ? 'Research ON' : 'Research OFF'}
-                </button>
+                </GlassButton>
                 {isStreaming ? (
-                  <button
+                  <GlassButton
+                    size="icon"
                     type="button"
                     onClick={handleStop}
-                    className="w-9 h-9 rounded-full bg-error/10 border border-error/20 flex items-center justify-center transition-all duration-300 ease-spring hover:bg-error/20 active:scale-[0.95]"
+                    className="!h-9 !w-9 !rounded-full"
                   >
-                    <X weight="light" className="w-4 h-4 text-error" />
-                  </button>
+                    <X weight="light" className="w-4 h-4" />
+                  </GlassButton>
                 ) : (
-                  <button
+                  <GlassButton
+                    size="icon"
                     type="submit"
                     disabled={!input.trim()}
-                    className="w-9 h-9 rounded-full bg-sage flex items-center justify-center text-cream transition-all duration-500 ease-spring hover:bg-sage-light active:scale-[0.95] disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="!h-9 !w-9 !rounded-full"
                   >
                     <PaperPlaneRight weight="light" className="w-4 h-4" />
-                  </button>
+                  </GlassButton>
                 )}
               </div>
             </div>

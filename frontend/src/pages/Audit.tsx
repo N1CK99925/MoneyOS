@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { fetchAuditLog } from '../lib/api'
 import type { AuditEntry } from '../types'
 import { useScrollReveal } from '../hooks'
+import { GlassButton } from '../components/ui/glass-button'
 
 const EASE: [number, number, number, number] = [0.32, 0.72, 0, 1]
 
@@ -43,7 +44,7 @@ export default function Audit() {
             Audit Log
           </h1>
           <p className="text-base text-ink-muted">
-            Cryptographically signed record of every system action. Tamper-proof.
+            Every action, signed and timestamped. Click any entry to see the full payload and HMAC signature.
           </p>
         </div>
 
@@ -83,9 +84,11 @@ export default function Audit() {
                   >
                     <div className="rounded-[1.25rem] bg-cream-dark border border-border-faint p-1">
                       <div className="rounded-[calc(1.25rem-4px)] bg-white border border-border-faint/50 inset-highlight">
-                        <button
+                        <GlassButton
+                          variant="ghost"
                           onClick={() => setExpandedId(isOpen ? null : entry.id)}
-                          className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left transition-all duration-300 ease-spring hover:bg-parchment/20 rounded-[calc(1.25rem-4px)]"
+                          className="w-full !rounded-[calc(1.25rem-4px)] justify-between"
+                          contentClassName="flex items-center justify-between gap-4 w-full"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <span className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ${colorClass}`}>
@@ -107,7 +110,7 @@ export default function Audit() {
                               <CaretDown weight="light" className="w-4 h-4 text-ink-muted" />
                             )}
                           </div>
-                        </button>
+                        </GlassButton>
 
                         <AnimatePresence>
                           {isOpen && (

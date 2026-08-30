@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Lightning } from 'phosphor-react'
+import { Lightning, List, X } from 'phosphor-react'
 import { useGoal } from '../../hooks'
+import { GlassButton } from '../ui/glass-button'
 
 const navLinks = [
   { to: '/', label: 'Home' },
@@ -54,36 +55,30 @@ export default function Navbar() {
           <div className="flex items-center gap-2">
             <Link
               to="/agent"
-              className={`hidden md:inline-flex items-center gap-2 rounded-full bg-ink text-cream px-5 py-2.5 text-sm font-medium transition-all duration-700 ease-spring hover:bg-ink-soft active:scale-[0.97] ${count > 0 ? 'ring-2 ring-sage/30' : ''
-                }`}
+              className={`hidden md:inline-flex no-underline ${count > 0 ? 'ring-2 ring-sage/30 rounded-full' : ''}`}
             >
-              <span>Launch Agent</span>
-              {count > 0 && (
-                <span className="w-2 h-2 rounded-full bg-sage animate-pulse" />
-              )}
+              <GlassButton size="sm" contentClassName="flex items-center gap-2">
+                <span>Launch Agent</span>
+                {count > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-sage animate-pulse" />
+                )}
+              </GlassButton>
             </Link>
 
             {/* Hamburger */}
-            <button
+            <GlassButton
+              size="icon"
+              variant="ghost"
               onClick={() => setOpen(!open)}
-              className="md:hidden relative w-10 h-10 rounded-full bg-parchment/50 flex items-center justify-center transition-all duration-500 ease-spring hover:bg-parchment"
+              className="md:hidden"
               aria-label="Toggle menu"
             >
-              <div className="relative w-5 h-4">
-                <span
-                  className={`absolute left-0 w-full h-[1.5px] bg-ink rounded-full transition-all duration-500 ease-spring ${open ? 'top-1/2 -translate-y-1/2 rotate-45' : 'top-0'
-                    }`}
-                />
-                <span
-                  className={`absolute left-0 top-1/2 -translate-y-1/2 w-full h-[1.5px] bg-ink rounded-full transition-all duration-500 ease-spring ${open ? 'opacity-0 scale-x-0' : 'opacity-100 scale-x-100'
-                    }`}
-                />
-                <span
-                  className={`absolute left-0 w-full h-[1.5px] bg-ink rounded-full transition-all duration-500 ease-spring ${open ? 'top-1/2 -translate-y-1/2 -rotate-45' : 'bottom-0'
-                    }`}
-                />
-              </div>
-            </button>
+              {open ? (
+                <X weight="light" className="w-5 h-5 text-ink" />
+              ) : (
+                <List weight="light" className="w-5 h-5 text-ink" />
+              )}
+            </GlassButton>
           </div>
         </div>
       </nav>
@@ -120,11 +115,13 @@ export default function Navbar() {
           <Link
             to="/agent"
             onClick={() => setOpen(false)}
-            className="reveal flex items-center justify-center gap-2 mt-4 rounded-full bg-ink text-cream px-6 py-4 text-base font-medium transition-all duration-700 ease-spring active:scale-[0.97]"
+            className="reveal no-underline mt-4"
             style={{ transitionDelay: '240ms' }}
           >
-            <Lightning weight="fill" className="w-4 h-4" />
-            <span>Launch Agent</span>
+            <GlassButton contentClassName="flex items-center gap-2 w-full justify-center">
+              <Lightning weight="fill" className="w-4 h-4" />
+              <span>Launch Agent</span>
+            </GlassButton>
           </Link>
         </div>
       </div>
