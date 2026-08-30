@@ -14,6 +14,13 @@ const actionColor: Record<string, string> = {
   checkout_canceled: 'bg-parchment text-ink-muted border-border-faint',
   checkout_failed: 'bg-error-surface text-error border-error-border',
   catalog_browsed: 'bg-parchment text-ink-muted border-border-faint',
+  'payment.failed': 'bg-error-surface text-error border-error-border',
+  'payment.captured': 'bg-sage-pale text-sage border-sage/10',
+  'payment.authorized': 'bg-sage-pale text-sage border-sage/10',
+  'order.paid': 'bg-sage-pale text-sage border-sage/10',
+  'order.failed': 'bg-error-surface text-error border-error-border',
+  'order.cancelled': 'bg-parchment text-ink-muted border-border-faint',
+  'order.expired': 'bg-parchment text-ink-muted border-border-faint',
   unknown_action: 'bg-parchment text-ink-muted border-border-faint',
 }
 
@@ -26,7 +33,7 @@ export default function Audit() {
 
   useEffect(() => {
     fetchAuditLog(100)
-      .then((data) => setEntries(data.entries ?? data))
+      .then((data) => setEntries(Array.isArray(data) ? data : data.entries ?? []))
       .catch(() => setError('Failed to load audit log'))
       .finally(() => setLoading(false))
   }, [])

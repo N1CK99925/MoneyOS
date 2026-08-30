@@ -41,10 +41,34 @@ export async function cancelCheckout(id: string) {
   return res.json()
 }
 
+export async function failCheckout(id: string, reason = 'Payment failed') {
+  const res = await fetch(`${API_BASE}/checkout_sessions/${id}/fail`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  if (!res.ok) throw new Error('Failed to mark checkout as failed')
+  return res.json()
+}
+
 export async function getRazorpayKey() {
   const res = await fetch(`${API_BASE}/razorpay_key`)
   if (!res.ok) throw new Error('Failed to fetch Razorpay key')
   return res.json()
+}
+
+export function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+      resolve(true)
+      return
+    }
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.body.appendChild(script)
+  })
 }
 
 export async function fetchAuditLog(limit = 50) {

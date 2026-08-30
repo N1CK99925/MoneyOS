@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { ShoppingCart, Plus, Minus, Trash, MagnifyingGlass } from 'phosphor-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { fetchCatalog, createCheckoutSession } from '../lib/api'
+import { fetchCatalog, createCheckoutSession, getRazorpayKey, loadRazorpayScript, completeCheckout, cancelCheckout, failCheckout } from '../lib/api'
 import type { CatalogItem } from '../types'
 import { useGoal } from '../hooks'
 import { GlassButton } from '../components/ui/glass-button'
@@ -57,8 +57,51 @@ export default function Catalog() {
     if (!firstItem) return
     const [itemId, qty] = firstItem
     try {
-      const session = await createCheckoutSession(itemId, qty)
+      const scriptLoaded = await loadRazorpayScript()
+      if (!scriptLoaded) {
+        setError('Failed to load payment script')
+        return
+      }
+      const [session, keyData] = await Promise.all([
+        createCheckoutSession(itemId, qty),
+        getRazorpayKey(),
+      ])
       setCheckoutId(session.session_id)
+
+      const options = {
+        key: keyData.key_id,
+        amount: session.total_paise,
+        currency: session.currency,
+        name: 'MoneyOS',
+        description: `Order for ${session.items?.[0]?.name ?? session.session_id}`,
+        order_id: session.razorpay_order_id,
+        handler: async () => {
+          try {
+            await completeCheckout(session.session_id)
+            setCheckoutId(null)
+            setCart({})
+          } catch {
+            setError('Payment received but confirmation failed. Check audit log.')
+          }
+        },
+        prefill: { name: '', email: '', contact: '' },
+        theme: { color: '#17A66B' },
+        modal: {
+          ondismiss: async () => {
+            try { await cancelCheckout(session.session_id) } catch {}
+            setCheckoutId(null)
+          },
+        },
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.on('payment.failed', async (resp: any) => {
+        const reason = resp.error?.description ?? 'Payment failed'
+        try { await failCheckout(session.session_id, reason) } catch {}
+        setError(`Payment failed: ${reason}`)
+        setCheckoutId(null)
+      })
+      rzp.open()
     } catch {
       setError('Checkout failed')
     }
@@ -233,9 +276,10 @@ export default function Catalog() {
 
         {/* ── Checkout session display ── */}
         {checkoutId && (
-          <div className="mt-8 rounded-2xl bg-sage-pale border border-sage/10 px-6 py-4 text-sm text-ink">
-            <span className="font-medium">Checkout session created.</span>{' '}
-            <span className="text-ink-muted font-mono text-xs">Order: {checkoutId}</span>
+          <div className="mt-8 rounded-2xl bg-sage-pale border border-sage/10 px-6 py-4 text-sm text-ink flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-sage animate-pulse" />
+            <span className="font-medium">Waiting for payment...</span>
+            <span className="text-ink-muted font-mono text-xs ml-auto">{checkoutId}</span>
           </div>
         )}
       </div>

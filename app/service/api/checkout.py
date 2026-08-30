@@ -284,6 +284,39 @@ def complete_checkout(
     )
 
 
+class CancelCheckoutResponse(BaseModel):
+    session_id: str
+    status: str
+    message: str
+
+
+class FailCheckoutRequest(BaseModel):
+    reason: str = "Payment failed"
+
+
+@router.post("/checkout_sessions/{session_id}/fail")
+def fail_checkout(session_id: str, body: FailCheckoutRequest, db: Session = Depends(get_db)):
+    session = _load_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session["status"] = "failed"
+    _save_session(db, session)
+
+    write_audit_row(
+        db,
+        actor="service",
+        action="checkout_failed",
+        entity_type="checkout_session",
+        entity_id=session_id,
+        payload={"razorpay_order_id": session["razorpay_order_id"], "reason": body.reason},
+        result="failure",
+        error_reason=body.reason,
+    )
+
+    return {"session_id": session_id, "status": "failed", "message": body.reason}
+
+
 @router.post("/checkout_sessions/{session_id}/cancel")
 def cancel_checkout(session_id: str, db: Session = Depends(get_db)):
     session = _load_session(db, session_id)
