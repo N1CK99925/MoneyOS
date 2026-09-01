@@ -11,7 +11,7 @@ import secrets
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db, write_audit_row
@@ -139,7 +139,7 @@ def approval_page(token: str, json: bool = False, db: Session = Depends(get_db))
     if row is None:
         if json:
             return {"error": "approval_not_found", "message": "Approval token not found"}
-        return HTML_NOT_FOUND
+        return Response(content=HTML_NOT_FOUND, media_type="text/html")
 
     import json as _json
 
@@ -159,62 +159,119 @@ def approval_page(token: str, json: bool = False, db: Session = Depends(get_db))
     if json:
         return context
 
-    return _render_approval_html(context, token)
+    return Response(content=_render_approval_html(context, token), media_type="text/html")
 
 
 # Inline HTML pages — bare minimum per the PRD, not app polish.
-HTML_NOT_FOUND = """<!doctype html><html><head><meta charset="utf-8"><title>Approval</title>
-<style>body{font-family:system-ui,monospace;background:#f4f4f0;color:#111;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-.card{background:#fff;border:2px solid #111;padding:2.5rem;max-width:440px;width:100%;box-shadow:8px 8px 0 #111}
-h1{font-size:1.4rem;margin:0 0 .4rem}b{font-size:2rem}</style></head>
-<body><div class="card"><h1>Approval</h1><p>This approval link is invalid or has already been used.</p></div></body></html>"""
+HTML_NOT_FOUND = (
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+    '<meta name="viewport" content="width=device-width, initial-scale=1">'
+    '<title>Approval — MoneyOS</title>'
+    '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    '<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">'
+    '<style>'
+    '*{margin:0;padding:0;box-sizing:border-box}'
+    'body{font-family:"Inter",system-ui,sans-serif;background:#F4F4F0;color:#111;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:1rem}'
+    '.card{background:#fff;border:2px solid #111;padding:3rem 2.5rem;max-width:440px;width:calc(100% - 2rem);box-shadow:8px 8px 0 #111;text-align:center}'
+    '.icon{width:48px;height:48px;border-radius:50%;background:#f8f9fa;border:2px solid #ddd;display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem;font-size:1.4rem}'
+    'h1{font-family:"DM Serif Display",serif;font-size:1.6rem;margin-bottom:0.5rem}'
+    'p{color:#666;font-size:0.9rem;line-height:1.6}'
+    '</style></head>'
+    '<body><div class="card">'
+    '<div class="icon">🔗</div>'
+    '<h1>Link Not Found</h1>'
+    '<p>This approval link is invalid or has already been used.</p>'
+    '</div></body></html>'
+)
 
 
 def _render_approval_html(ctx: dict[str, Any], token: str) -> str:
     total_inr = ctx["total_paise"] / 100
     if ctx["expired"]:
         return (
-            "<!doctype html><html><head><meta charset=\"utf-8\"><title>Approval expired</title>"
-            "<style>body{font-family:system-ui,monospace;background:#f4f4f0;color:#111;"
-            "display:flex;align-items:center;justify-content:center;height:100vh;margin:0}"
-            ".card{background:#fff;border:2px solid #111;padding:2.5rem;max-width:440px;"
-            "width:100%;box-shadow:8px 8px 0 #111}"
-            "h1{font-size:1.4rem;margin:0 0 .4rem}</style></head>"
-            "<body><div class=\"card\"><h1>Approval expired</h1>"
-            "<p>This approval link has expired. No money was moved.</p></div></body></html>"
+            '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            '<title>Approval Expired — MoneyOS</title>'
+            '<link rel="preconnect" href="https://fonts.googleapis.com">'
+            '<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">'
+            '<style>'
+            '*{margin:0;padding:0;box-sizing:border-box}'
+            'body{font-family:"Inter",system-ui,sans-serif;background:#F4F4F0;color:#111;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}'
+            '.card{background:#fff;border:2px solid #111;padding:3rem 2.5rem;max-width:440px;width:calc(100% - 2rem);box-shadow:8px 8px 0 #111;text-align:center}'
+            '.icon{width:48px;height:48px;border-radius:50%;background:#f8d7da;border:2px solid #dc3545;display:flex;align-items:center;justify-content:center;margin:0 auto 1.2rem;font-size:1.4rem}'
+            'h1{font-family:"DM Serif Display",serif;font-size:1.6rem;margin-bottom:0.5rem}'
+            'p{color:#666;font-size:0.9rem;line-height:1.6}'
+            '</style></head>'
+            '<body><div class="card">'
+            '<div class="icon">⏱</div>'
+            '<h1>Approval Expired</h1>'
+            '<p>This approval link has expired. No payment was captured.</p>'
+            '</div></body></html>'
         )
 
     items_html = "".join(
-        f"<li><b>{it.get('name')}</b> &times;{it.get('quantity', 1)}</li>" for it in ctx["items"]
+        f"<tr><td class='item-name'>{it.get('name')}</td><td class='item-qty'>×{it.get('quantity', 1)}</td><td class='item-price'>₹{it.get('price_paise', 0) / 100:,.0f}</td></tr>"
+        for it in ctx["items"]
     )
     session_id = ctx["session_id"]
     return (
-        "<!doctype html><html><head><meta charset=\"utf-8\"><title>Approve purchase</title>"
-        "<style>"
-        "body{font-family:system-ui,monospace;background:#f4f4f0;color:#111;"
-        "display:flex;align-items:center;justify-content:center;height:100vh;margin:0}"
-        ".card{background:#fff;border:2px solid #111;padding:2.5rem;max-width:440px;"
-        "width:100%;box-shadow:8px 8px 0 #111}"
-        "h1{font-size:1.4rem;margin:0 0 .4rem}ul{padding-left:1.2rem}b{font-size:2rem}"
-        ".row{display:flex;gap:1rem;margin-top:1.6rem}"
-        "button{flex:1;padding:.8rem;font-weight:700;font-family:inherit;cursor:pointer;"
-        "border:2px solid #111;font-size:1rem}"
-        ".approve{background:#EDFF45;color:#111}.deny{background:#fff;color:#111}"
-        ".meta{color:#555;font-size:.8rem;margin-top:1rem}"
-        "</style></head>"
-        "<body><div class=\"card\"><h1>Approve purchase</h1><ul>"
-        f"{items_html}</ul><p>Total: <b>₹{total_inr:,.2f}</b> ({ctx['currency']})</p>"
-        "<div class=\"row\">"
-        '<button class="approve" onclick="post(\'approve\')">Approve</button>'
-        '<button class="deny" onclick="post(\'deny\')">Deny</button>'
-        "</div>"
-        f"<div class=\"meta\">Session {session_id}</div></div>"
-        "<script>"
-        f"async function post(path){{const r=await fetch('/api/approval/{token}/'+path,"
-        "{{method:'POST'}});const t=await r.text();"
-        "document.body.innerHTML='<pre style=\"white-space:pre-wrap;padding:2rem\">'"
-        "+t.replace(/</g,'&lt;')+'</pre>';}"
-        "</script></body></html>"
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>Approve Purchase — MoneyOS</title>'
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">'
+        '<style>'
+        '*{margin:0;padding:0;box-sizing:border-box}'
+        'body{font-family:"Inter",system-ui,sans-serif;background:#F4F4F0;color:#111;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:1rem}'
+        '.card{background:#fff;border:2px solid #111;padding:2.5rem;max-width:460px;width:100%;box-shadow:8px 8px 0 #111}'
+        '.badge{display:inline-flex;align-items:center;gap:6px;background:#EDFF45;color:#111;border:1px solid #111;border-radius:999px;padding:4px 14px;font-size:0.7rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:1.5rem}'
+        'h1{font-family:"DM Serif Display",serif;font-size:1.7rem;margin-bottom:1.5rem;line-height:1.2}'
+        'table{width:100%;border-collapse:collapse;margin-bottom:1.5rem}'
+        'tr{border-bottom:1px solid #eee}'
+        'td{padding:0.7rem 0;font-size:0.9rem}'
+        '.item-name{font-weight:600}'
+        '.item-qty{color:#999;text-align:center;width:40px}'
+        '.item-price{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}'
+        '.total-row{border-bottom:none;border-top:2px solid #111}'
+        '.total-row td{padding-top:0.9rem;font-weight:700;font-size:1.1rem}'
+        '.total-label{color:#666;font-weight:500}'
+        '.total-val{font-variant-numeric:tabular-nums}'
+        '.row{display:flex;gap:0.75rem;margin-top:1.8rem}'
+        'button{flex:1;padding:0.9rem;font-weight:700;font-family:inherit;cursor:pointer;border:2px solid #111;font-size:0.95rem;border-radius:0;transition:transform 0.1s,box-shadow 0.1s}'
+        'button:active{transform:translate(2px,2px);box-shadow:none}'
+        '.approve{background:#EDFF45;color:#111}'
+        '.approve:hover{background:#e5f53e}'
+        '.deny{background:#fff;color:#111}'
+        '.deny:hover{background:#f4f4f0}'
+        '.meta{color:#999;font-size:0.72rem;margin-top:1.2rem;font-family:monospace;letter-spacing:0.02em}'
+        '.shield{display:flex;align-items:center;justify-content:center;gap:6px;color:#999;font-size:0.75rem;margin-top:1rem}'
+        '</style></head>'
+        '<body><div class="card">'
+        '<div class="badge">⚡ Awaiting Approval</div>'
+        '<h1>Approve this purchase?</h1>'
+        '<table>'
+        f'{items_html}'
+        '<tr class="total-row">'
+        f"<td class='total-label'>Total</td><td></td><td class='total-val'>₹{total_inr:,.2f}</td>"
+        '</tr>'
+        '</table>'
+        '<div class="row">'
+        '<button class="approve" onclick="post(\'approve\')">✓ Approve</button>'
+        '<button class="deny" onclick="post(\'deny\')">✗ Deny</button>'
+        '</div>'
+        '<div class="shield">🔒 Single-use link · expires in 5 minutes</div>'
+        f"<div class='meta'>{session_id}</div>"
+        '</div>'
+        '<script>'
+        f"async function post(path){{const r=await fetch('/api/approval/{token}/'+path,{{method:'POST'}});const j=await r.json();"
+        'document.body.innerHTML='
+        "'<div style=\"max-width:460px;margin:0 auto;padding:3rem 2.5rem;text-align:center;font-family:Inter,system-ui,sans-serif\">'"
+        "+('<div style=\"width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.4rem;background:'+(j.status==='completed'?'#d4edda;border:2px solid #28a745':'#f8d7da;border:2px solid #dc3545')+'\">'+(j.status==='completed'?'✅':'❌')+'</div>')"
+        "+'<h1 style=\"font-family:DM Serif Display,serif;font-size:1.6rem;margin-bottom:0.5rem\">'+(j.status==='completed'?'Purchase Approved':'Purchase Denied')+'</h1>'"
+        "+'<p style=\"color:#666;font-size:0.9rem\">'+(j.message||'')+'</p>'"
+        "+'</div>'}"
+        '</script>'
+        '</body></html>'
     )
 
 

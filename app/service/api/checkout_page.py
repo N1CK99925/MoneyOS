@@ -8,6 +8,7 @@ session's order ID.
 This avoids using Razorpay's payment-link API (which creates a separate
 order disconnected from the checkout session).
 """
+# ruff: noqa: E501  # inline HTML templates contain long lines
 
 from __future__ import annotations
 
@@ -135,11 +136,33 @@ def checkout_page(session_id: str, db: Session = Depends(get_db)) -> Response:
 
     options.handler = function (resp) {{
       const status = document.getElementById('status');
-      status.className = 'success';
+      status.className = 'pending';
       status.style.display = 'block';
-      status.innerHTML = '✅ Payment successful!<br>'
-        + 'Payment ID: ' + resp.razorpay_payment_id + '<br>'
-        + '<a href="/" style="color:#155724">Return to MoneyOS</a>';
+      status.innerHTML = '✅ Payment successful — finalizing order…';
+
+      // Auto-complete the checkout so the approval flow triggers
+      fetch('/api/checkout_sessions/{session_id}/complete?poll=true', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+      }})
+        .then(function(r) {{ return r.json(); }})
+        .then(function(data) {{
+          if (data.status === 'pending_approval') {{
+            status.className = 'pending';
+            status.innerHTML = '⏳ Order submitted for approval.<br>'
+              + (data.approval_url ? '<a href="' + data.approval_url + '" style="color:#856404">Open approval page</a>' : '');
+          }} else if (data.status === 'completed') {{
+            status.className = 'success';
+            status.innerHTML = '✅ Order confirmed! Payment ID: ' + resp.razorpay_payment_id;
+          }} else {{
+            status.className = 'success';
+            status.innerHTML = '✅ Payment received. Status: ' + data.status;
+          }}
+        }})
+        .catch(function() {{
+          status.className = 'success';
+          status.innerHTML = '✅ Payment successful — refresh the agent chat to see updates.';
+        }});
     }};
 
     options.modal.ondismiss = function () {{

@@ -39,6 +39,8 @@ def _update_session_status(db: Session, order_id: str, status: str) -> None:
 
 
 @router.post("/webhooks/razorpay")
+@router.post("/app/webhooks")
+@router.post("/app/webhooks/razorpay")
 async def razorpay_webhook(
     request: Request,
     x_razorpay_signature: str = Header(default=""),
