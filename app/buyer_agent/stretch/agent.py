@@ -18,8 +18,6 @@ from service.settings import settings
 from ..tools import (
     TOOL_DEFINITIONS,
     TOOL_FUNCTIONS,
-    create_checkout_session,
-    get_checkout_session,
     search_catalog,
 )
 from .scoring import score_items
@@ -39,8 +37,17 @@ How to work:
 2. For each candidate item, search the web for reviews and ratings.
 3. Score items using the review data — pick the highest-rated item with enough reviews.
 4. Create a checkout session with the best item.
-5. Complete the checkout to finalize the purchase.
-6. Report what you bought, its rating, number of reviews, and price.
+5. Get a payment link OR test card details so the user can pay.
+6. After the user pays, complete the checkout to finalize the purchase.
+7. Report what you bought, its rating, number of reviews, and price.
+
+Payment flow (IMPORTANT):
+- After creating a checkout session, you MUST get a payment method:
+  - Use `get_payment_link` to generate a hosted checkout URL, OR
+  - Use `pay_with_test_card` to get test card details for manual entry
+- Share the payment link or test card details with the user.
+- Only call `complete_checkout` AFTER the user has paid (payment is confirmed).
+- If you call `complete_checkout` before payment, it will return a 400 error.
 
 Rules:
 - Always search the catalog first — never guess product IDs.
@@ -108,6 +115,7 @@ def _execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
     try:
+        # Catalog + checkout tools
         if tool_name == "create_checkout_session" and "items" in tool_args:
             items = tool_args["items"]
             buyer_id = tool_args.get("buyer_agent_id", "stretch-agent")
@@ -116,13 +124,28 @@ def _execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
             return fn(query=tool_args["query"])
         if tool_name in ("complete_checkout", "cancel_checkout", "get_checkout_session"):
             return fn(session_id=tool_args["session_id"])
+
+        # Payment tools
+        if tool_name == "get_payment_link":
+            return fn(
+                session_id=tool_args["session_id"],
+                amount_paise=tool_args["amount_paise"],
+                item_name=tool_args.get("item_name", "Item"),
+            )
+        if tool_name == "pay_with_test_card":
+            return fn(
+                session_id=tool_args["session_id"],
+                amount_paise=tool_args["amount_paise"],
+                card=tool_args.get("card", "visa"),
+            )
+
         return fn(**tool_args)
     except Exception as e:
         logger.exception("Tool %s failed", tool_name)
         return json.dumps({"error": str(e)})
 
 
-# Extended tool definitions — adds search_and_score
+# Extended tool definitions — adds search_and_score on top of all base tools
 STRETCH_TOOL_DEFINITIONS: list[dict[str, Any]] = [
     *TOOL_DEFINITIONS,
     {
@@ -152,6 +175,7 @@ STRETCH_TOOL_DEFINITIONS: list[dict[str, Any]] = [
 def run_stretch_agent(
     goal: str,
     *,
+    history: list[dict[str, Any]] | None = None,
     verbose: bool = False,
     on_event: EventCallback | None = None,
 ) -> str:
@@ -161,6 +185,8 @@ def run_stretch_agent(
     ----------
     goal : str
         The purchase goal, e.g. "buy the best biriyani under ₹500".
+    history : list of dicts, optional
+        Prior conversation turns (role/content pairs) for multi-turn context.
     verbose : bool
         If True, print each tool call and result.
     on_event : callback(event_type, data) or None
@@ -174,8 +200,10 @@ def run_stretch_agent(
     models = _build_models()
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": _SYSTEM_PROMPT},
-        {"role": "user", "content": goal},
     ]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": goal})
 
     last_error: str | None = None
 
@@ -210,13 +238,18 @@ def _run_loop(
     for iteration in range(1, max_iter + 1):
         logger.info("Iteration %d/%d", iteration, max_iter)
 
-        response = litellm.completion(
-            model=model,
-            messages=messages,
-            tools=STRETCH_TOOL_DEFINITIONS,
-            tool_choice="auto",
-            api_key=settings.llm_api_key or None,
-        )
+        try:
+            response = litellm.completion(
+                model=model,
+                messages=messages,
+                tools=STRETCH_TOOL_DEFINITIONS,
+                tool_choice="auto",
+                api_key=settings.llm_api_key or None,
+            )
+        except Exception as e:
+            error_msg = f"LLM call failed on {model}: {e}"
+            logger.warning(error_msg)
+            raise RuntimeError(error_msg) from e
 
         message = response.choices[0].message
 

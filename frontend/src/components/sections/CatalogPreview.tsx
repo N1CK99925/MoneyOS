@@ -1,36 +1,59 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'phosphor-react'
 import { useScrollReveal } from '../../hooks'
+import { fetchCatalog } from '../../lib/api'
 import type { CatalogItem } from '../../types'
 
-interface Props {
-  items?: CatalogItem[]
-}
-
-export default function CatalogPreview({ items = [] }: Props) {
-  const headlineRef = useScrollReveal()
+export default function CatalogPreview() {
+  const headerRef = useScrollReveal()
   const gridRef = useScrollReveal(0.05)
+  const [items, setItems] = useState<CatalogItem[]>([])
+
+  useEffect(() => {
+    fetchCatalog()
+      .then(setItems)
+      .catch(() => setItems([]))
+  }, [])
 
   return (
-    <section className="px-4 py-24 md:py-32">
+    <section className="px-4 py-24 md:py-32 border-t border-white/5">
       <div className="max-w-5xl mx-auto">
         {/* ── Section header ── */}
-        <div ref={headlineRef} className="reveal mb-16">
-          <span className="inline-flex items-center gap-2 rounded-full bg-[#C7F464]/10 backdrop-blur-sm px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-medium text-[#C7F464] border border-[#C7F464]/20 mb-5">
-            Marketplace
-          </span>
-          <h2 className="font-display text-3xl md:text-5xl font-bold tracking-tight text-white mb-4">
-            What you can buy
-          </h2>
-          <p className="text-base text-white/50 max-w-lg">
-            Browse the catalog yourself, or tell the agent what you need — it finds, compares, and buys for you.
-          </p>
+        <div ref={headerRef} className="reveal mb-14">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-8">
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <span className="w-8 h-px bg-[#C7F464]/60" />
+                <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-[#C7F464]">
+                  02 / Marketplace
+                </span>
+              </div>
+              <h2 className="font-display text-4xl md:text-6xl font-bold tracking-tight uppercase leading-[0.95] text-white">
+                What you
+                <br />
+                can buy
+              </h2>
+              <p className="mt-6 text-base md:text-lg text-white/50 max-w-lg leading-relaxed">
+                Browse the catalog yourself, or tell the agent what you need —
+                it finds, compares, and buys for you.
+              </p>
+            </div>
+
+            <Link
+              to="/catalog"
+              className="group inline-flex items-center gap-3 rounded-none border border-white/20 px-6 py-3.5 text-sm font-mono uppercase tracking-[0.15em] text-white/80 no-underline transition-all duration-500 ease-spring hover:bg-[#C7F464] hover:text-[#0D1B0F] hover:border-[#C7F464] shrink-0 w-fit"
+            >
+              <span>View all</span>
+              <ArrowRight weight="light" className="w-4 h-4 transition-transform duration-500 ease-spring group-hover:translate-x-1" />
+            </Link>
+          </div>
         </div>
 
         {/* ── Bento grid ── */}
         <div
           ref={gridRef}
-          className="reveal grid grid-cols-1 md:grid-cols-12 gap-4 stagger-children"
+          className="reveal grid grid-cols-1 md:grid-cols-12 gap-4"
         >
           {items.slice(0, 4).map((item, i) => {
             const span =
@@ -43,41 +66,38 @@ export default function CatalogPreview({ items = [] }: Props) {
               <Link
                 key={item.id}
                 to="/catalog"
-                className={`reveal group no-underline ${span}`}
+                className={`group no-underline ${span}`}
               >
-                <div className="h-full rounded-[1.5rem] bg-white/5 backdrop-blur-sm border border-white/10 p-1 transition-all duration-700 ease-spring hover:border-white/20 hover:bg-white/10">
-                  <div className="h-full rounded-[calc(1.5rem-4px)] bg-white/5 border border-white/5 p-6 flex flex-col justify-between min-h-[180px] transition-all duration-700 ease-spring">
-                    <div>
-                      <span className="font-mono text-[10px] text-white/40 tracking-wider uppercase">{item.id}</span>
-                      <h3 className="font-display text-xl font-semibold text-white mt-2 mb-3">{item.name}</h3>
-                      <p className="text-sm text-white/40 leading-relaxed line-clamp-2">{item.description ?? ''}</p>
-                    </div>
-                    <div className="flex items-center justify-between mt-5">
-                      <span className="font-mono text-base font-medium text-[#C7F464]">
-                        ₹{Math.round(item.price_paise / 100)}
+                <div className="h-full flex flex-col justify-between border border-white/10 bg-white/[0.03] backdrop-blur-sm p-7 transition-all duration-700 ease-spring hover:border-[#C7F464]/40 hover:bg-white/[0.06] min-h-[180px]">
+                  <div>
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40 group-hover:text-[#C7F464]/80 transition-colors duration-500">
+                        {item.id}
                       </span>
-                      <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center transition-all duration-500 ease-spring group-hover:bg-[#C7F464] group-hover:text-[#0D1B0F]">
-                        <ArrowRight weight="light" className="w-4 h-4 text-white/60 group-hover:text-[#0D1B0F]" />
+                      <span className="font-mono text-[10px] text-white/25">
+                        {String(i + 1).padStart(2, '0')}
                       </span>
                     </div>
+                    <h3 className="font-display text-2xl md:text-3xl font-semibold uppercase text-white mt-5 mb-3 leading-tight">
+                      {item.name}
+                    </h3>
+                    <p className="text-sm text-white/40 leading-relaxed line-clamp-2">
+                      {item.description ?? ''}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-8 pt-5 border-t border-white/10">
+                    <span className="font-mono text-lg font-medium text-[#C7F464]">
+                      ₹{Math.round(item.price_paise / 100)}
+                    </span>
+                    <span className="w-9 h-9 border border-white/15 flex items-center justify-center transition-all duration-500 ease-spring group-hover:bg-[#C7F464] group-hover:border-[#C7F464] group-hover:text-[#0D1B0F] text-white/60">
+                      <ArrowRight weight="light" className="w-4 h-4" />
+                    </span>
                   </div>
                 </div>
               </Link>
             )
           })}
-        </div>
-
-        {/* ── View all link ── */}
-        <div className="mt-10 text-center">
-          <Link
-            to="/catalog"
-            className="group inline-flex items-center gap-0 rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white/70 no-underline transition-all duration-500 ease-spring hover:bg-white/10 active:scale-[0.97]"
-          >
-            <span>View all products</span>
-            <span className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center ml-3 transition-all duration-500 ease-spring group-hover:bg-[#C7F464] group-hover:text-[#0D1B0F]">
-              <ArrowRight weight="light" className="w-3.5 h-3.5" />
-            </span>
-          </Link>
         </div>
       </div>
     </section>

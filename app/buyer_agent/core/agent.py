@@ -41,8 +41,17 @@ How to work:
 1. First, search the catalog to find relevant products.
 2. Pick the best match based on the user's goal (price, name, description).
 3. Create a checkout session with the selected item.
-4. Complete the checkout to finalize the purchase.
-5. Report what you bought and for how much.
+4. Get a payment link OR test card details so the user can pay.
+5. After the user pays, complete the checkout to finalize the purchase.
+6. Report what you bought and for how much.
+
+Payment flow (IMPORTANT):
+- After creating a checkout session, you MUST get a payment method:
+  - Use `get_payment_link` to generate a hosted checkout URL, OR
+  - Use `pay_with_test_card` to get test card details for manual entry
+- Share the payment link or test card details with the user.
+- Only call `complete_checkout` AFTER the user has paid (payment is confirmed).
+- If you call `complete_checkout` before payment, it will return a 400 error.
 
 Rules:
 - Always search the catalog first — never guess product IDs.
@@ -74,14 +83,31 @@ def _execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
 
     try:
+        # Catalog + checkout tools (HTTP-based)
+        if tool_name == "search_catalog":
+            return fn(query=tool_args["query"])
         if tool_name == "create_checkout_session" and "items" in tool_args:
             items = tool_args["items"]
             buyer_id = tool_args.get("buyer_agent_id", "llm-agent")
             return fn(items=items, buyer_agent_id=buyer_id)
-        if tool_name == "search_catalog":
-            return fn(query=tool_args["query"])
         if tool_name in ("complete_checkout", "cancel_checkout", "get_checkout_session"):
             return fn(session_id=tool_args["session_id"])
+
+        # Payment tools (Razorpay API)
+        if tool_name == "get_payment_link":
+            return fn(
+                session_id=tool_args["session_id"],
+                amount_paise=tool_args["amount_paise"],
+                item_name=tool_args.get("item_name", "Item"),
+            )
+        if tool_name == "pay_with_test_card":
+            return fn(
+                session_id=tool_args["session_id"],
+                amount_paise=tool_args["amount_paise"],
+                card=tool_args.get("card", "visa"),
+            )
+
+        # Generic fallback
         return fn(**tool_args)
     except Exception as e:
         logger.exception("Tool %s failed", tool_name)
@@ -91,6 +117,7 @@ def _execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
 def run_buyer_agent(
     goal: str,
     *,
+    history: list[dict[str, Any]] | None = None,
     verbose: bool = False,
     on_event: EventCallback | None = None,
 ) -> str:
@@ -100,6 +127,9 @@ def run_buyer_agent(
     ----------
     goal : str
         The purchase goal, e.g. "buy chicken biriyani under ₹500".
+    history : list of dicts, optional
+        Prior conversation turns (role/content pairs) for multi-turn context.
+        Injected between the system prompt and the current user message.
     verbose : bool
         If True, print each tool call and result.
     on_event : callback(event_type, data) or None
@@ -115,8 +145,10 @@ def run_buyer_agent(
     models = _build_models()
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": _SYSTEM_PROMPT},
-        {"role": "user", "content": goal},
     ]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": goal})
 
     last_error: str | None = None
 
@@ -174,13 +206,18 @@ def _run_loop(
     for iteration in range(1, max_iter + 1):
         logger.info("Iteration %d/%d", iteration, max_iter)
 
-        response = litellm.completion(
-            model=model,
-            messages=messages,
-            tools=TOOL_DEFINITIONS,
-            tool_choice="auto",
-            api_key=settings.llm_api_key or None,
-        )
+        try:
+            response = litellm.completion(
+                model=model,
+                messages=messages,
+                tools=TOOL_DEFINITIONS,
+                tool_choice="auto",
+                api_key=settings.llm_api_key or None,
+            )
+        except Exception as e:
+            error_msg = f"LLM call failed on {model}: {e}"
+            logger.warning(error_msg)
+            raise RuntimeError(error_msg) from e
 
         message = response.choices[0].message
 

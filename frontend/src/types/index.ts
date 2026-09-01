@@ -17,11 +17,14 @@ export interface CheckoutSession {
   razorpay_payment_id?: string
 }
 
+export type AgentMessageType = 'message' | 'progress'
+
 export interface AgentMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: number
+  type?: AgentMessageType
 }
 
 export interface AuditEntry {

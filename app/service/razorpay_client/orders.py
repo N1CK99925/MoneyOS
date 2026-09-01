@@ -32,6 +32,12 @@ def fetch_order(order_id: str) -> dict:
     return client.order.fetch(order_id)
 
 
+def cancel_order(order_id: str) -> dict:
+    """Cancel a Razorpay order (only valid before payment is captured)."""
+    client = get_razorpay_client()
+    return client.order.cancel(order_id, {})
+
+
 def poll_order_status(
     order_id: str,
     *,

@@ -23,9 +23,13 @@ class AgentRunRequest(BaseModel):
         default=False,
         description="Use stretch agent with web search + review scoring",
     )
+    history: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Prior conversation turns for multi-turn context",
+    )
 
 
-def _sse_stream(goal: str, stretch: bool = False) -> Any:
+def _sse_stream(goal: str, stretch: bool = False, history: list[dict[str, Any]] | None = None) -> Any:
     """Generator that yields SSE events from the buyer agent."""
     q: queue.Queue[tuple[str, dict[str, Any]]] = queue.Queue()
 
@@ -35,7 +39,7 @@ def _sse_stream(goal: str, stretch: bool = False) -> Any:
     def run() -> None:
         try:
             agent_fn = run_stretch_agent if stretch else run_buyer_agent
-            result = agent_fn(goal, on_event=on_event)
+            result = agent_fn(goal, history=history, on_event=on_event)
             q.put(("done", {"result": result}))
         except Exception as e:
             q.put(("error", {"message": str(e)}))
@@ -55,6 +59,9 @@ def _sse_stream(goal: str, stretch: bool = False) -> Any:
         if event_type in ("done", "error"):
             break
 
+    # Ensure the thread is cleaned up
+    thread.join(timeout=5)
+
 
 @router.post("/agent/run")
 async def run_agent(body: AgentRunRequest):
@@ -62,4 +69,4 @@ async def run_agent(body: AgentRunRequest):
     if not body.goal.strip():
         raise HTTPException(status_code=400, detail="Goal cannot be empty")
 
-    return EventSourceResponse(_sse_stream(body.goal, body.stretch))
+    return EventSourceResponse(_sse_stream(body.goal, body.stretch, body.history))

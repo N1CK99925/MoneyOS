@@ -79,17 +79,18 @@ export async function fetchAuditLog(limit = 50) {
 
 export function streamAgentRun(
   goal: string,
-  onMessage: (data: string) => void,
+  onMessage: (data: string, type?: 'message' | 'progress') => void,
   onDone: () => void,
   onError: (err: Error) => void,
   stretch: boolean = false,
+  history: { role: string; content: string }[] = [],
 ) {
   const controller = new AbortController()
 
   fetch(`${API_BASE}/agent/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ goal, stretch }),
+    body: JSON.stringify({ goal, stretch, history }),
     signal: controller.signal,
   })
     .then(async (res) => {
@@ -98,8 +99,10 @@ export function streamAgentRun(
       if (!reader) throw new Error('No response body')
       const decoder = new TextDecoder()
       let buffer = ''
+      let finished = false
+      let renderedSummary = false
 
-      while (true) {
+      while (!finished) {
         const { done, value } = await reader.read()
         if (done) break
 
@@ -126,48 +129,50 @@ export function streamAgentRun(
             const parsed = JSON.parse(data)
 
             if (eventType === 'done' || eventType === 'error') {
+              // On a normal completion the 'summary' event already carried the
+              // final text — only render here for the error path (no summary).
               const text = parsed.result || parsed.message || ''
-              if (text) onMessage(text)
-              onDone()
-              return
+              if (text && !renderedSummary) onMessage(text)
+              finished = true
+              break
             }
 
             if (eventType === 'summary') {
+              renderedSummary = true
               onMessage(parsed.message || '')
             } else if (eventType === 'tool_call') {
               const name = parsed.name || 'unknown'
               const args = parsed.args
-              let detail = `[calling ${name}]`
-              if (name === 'search_catalog') detail = `[searching catalog: ${args?.query || ''}]`
-              else if (name === 'search_and_score') detail = `[researching: ${args?.query || ''}]`
-              else if (name === 'create_checkout_session') detail = `[creating checkout]`
-              else if (name === 'complete_checkout') detail = `[completing payment]`
-              else if (name === 'cancel_checkout') detail = `[canceling order]`
-              else if (name === 'get_checkout_session') detail = `[checking status]`
-              onMessage(`\n${detail}\n`)
+              let detail = ''
+              if (name === 'search_catalog') detail = `Searching catalog for "${args?.query || '...'}"…`
+              else if (name === 'search_and_score') detail = `Researching "${args?.query || '...'}"…`
+              else if (name === 'create_checkout_session') detail = 'Creating checkout…'
+              else if (name === 'get_payment_link') detail = 'Generating payment page…'
+              else if (name === 'pay_with_test_card') detail = 'Preparing test payment…'
+              else if (name === 'complete_checkout') detail = 'Verifying payment…'
+              else if (name === 'cancel_checkout') detail = 'Canceling order…'
+              else if (name === 'get_checkout_session') detail = 'Checking order status…'
+              if (detail) onMessage(detail, 'progress')
             } else if (eventType === 'tool_result') {
               const result = parsed.result || ''
               try {
                 const json = JSON.parse(result)
                 if (json.best_match) {
-                  onMessage(`Found: ${json.best_match.name} — rating ${json.best_match.rating || 'N/A'}, ${json.best_match.review_count || 0} reviews, ₹${Math.round((json.best_match.price_paise || 0) / 100)}\n`)
-                } else if (json.matches) {
-                  onMessage(`Found ${json.matches.length} items\n`)
+                  onMessage(`Found: ${json.best_match.name} — ₹${Math.round((json.best_match.price_paise || 0) / 100)}`)
+                } else if (json.checkout_url) {
+                  // Don't show raw URL as progress — the summary will include it
+                } else if (json.card) {
+                  // Test card info — will be in summary
                 } else if (json.status === 'completed') {
-                  onMessage(`Payment confirmed\n`)
-                } else if (json.message) {
-                  onMessage(`${json.message}\n`)
+                  onMessage('Payment confirmed', 'progress')
+                } else if (json.status === 'pending_approval') {
+                  onMessage('Order pending approval', 'progress')
                 }
               } catch {
-                if (result.length > 100) onMessage(`${result.slice(0, 100)}...\n`)
+                // ignore unparseable results
               }
-            } else if (eventType === 'model_switch') {
-              onMessage(`[using ${parsed.model}]\n`)
-            } else if (eventType === 'model_error') {
-              onMessage(`[${parsed.model} failed, trying next]\n`)
-            } else if (eventType === 'rate_limit_wait') {
-              onMessage(`[rate limited — waiting ${parsed.seconds}s]\n`)
             }
+            // Hide: model_switch, model_error, rate_limit_wait (internal details)
           } catch {
             if (data && data !== '{}') onMessage(data + '\n')
           }

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Lightning, X, PaperPlaneRight } from 'phosphor-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { streamAgentRun } from '../lib/api'
-import type { AgentMessage } from '../types'
+import type { AgentMessage, AgentMessageType } from '../types'
 import { useGoal, useScrollReveal } from '../hooks'
 import { GlassButton } from '../components/ui/glass-button'
 
@@ -16,6 +16,9 @@ export default function Agent() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<(() => void) | null>(null)
   const lastRunGoal = useRef<string>('')
+  const lastGoalFromContext = useRef<string>('')
+  const directInputRef = useRef(false)
+  const conversationHistoryRef = useRef<{ role: string; content: string }[]>([])
   const { buildGoal, clearItems } = useGoal()
   const headerRef = useScrollReveal()
 
@@ -32,23 +35,51 @@ export default function Agent() {
     lastRunGoal.current = goal
     const now = Date.now()
     const userMsg: AgentMessage = { id: crypto.randomUUID(), role: 'user', content: goal, timestamp: now }
+
+    // History = all previously completed turns, tracked in a ref (single source of truth).
+    // Do NOT try to read it out of a setMessages updater — that runs asynchronously
+    // during the next render, so it would still be empty here.
+    const apiHistory = conversationHistoryRef.current
+
     setMessages((prev) => [...prev, userMsg])
+
     setIsStreaming(true)
     let agentContent = ''
 
     abortRef.current = streamAgentRun(
       goal,
-      (chunk) => {
+      (chunk, type) => {
+        const msgType: AgentMessageType = type || 'message'
+
+        if (msgType === 'progress') {
+          // Replace the last progress message if it exists
+          setMessages((prev) => {
+            const last = prev[prev.length - 1]
+            if (last?.role === 'assistant' && last.type === 'progress') {
+              return [...prev.slice(0, -1), { ...last, content: chunk, timestamp: Date.now() }]
+            }
+            return [...prev, { id: crypto.randomUUID(), role: 'assistant', content: chunk, timestamp: Date.now(), type: 'progress' }]
+          })
+          return
+        }
+
+        // Message content — append or create
         agentContent += chunk
         setMessages((prev) => {
           const last = prev[prev.length - 1]
-          if (last?.role === 'assistant') {
+          if (last?.role === 'assistant' && last.type !== 'progress') {
             return [...prev.slice(0, -1), { ...last, content: agentContent }]
           }
           return [...prev, { id: crypto.randomUUID(), role: 'assistant', content: agentContent, timestamp: Date.now() }]
         })
       },
       () => {
+        // On completion — persist this turn so the next message has full context
+        conversationHistoryRef.current = [
+          ...conversationHistoryRef.current,
+          { role: 'user', content: goal },
+          ...(agentContent ? [{ role: 'assistant' as const, content: agentContent }] : []),
+        ]
         setIsStreaming(false)
         abortRef.current = null
       },
@@ -61,21 +92,29 @@ export default function Agent() {
         abortRef.current = null
       },
       isStretch,
+      apiHistory,
     )
   }, [isStreaming, isStretch])
 
   useEffect(() => {
-    if (goalText && !isStreaming && goalText !== lastRunGoal.current) {
+    if (directInputRef.current) {
+      directInputRef.current = false
+      lastGoalFromContext.current = goalText
+      return
+    }
+    if (goalText && goalText !== lastGoalFromContext.current && !isStreaming && goalText !== lastRunGoal.current) {
+      lastGoalFromContext.current = goalText
       runGoal(goalText)
     }
-  }, [goalText]) // only watch goalText — isStreaming handled inside runGoal
+  }, [goalText, isStreaming, runGoal])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const goal = input.trim()
     if (!goal || isStreaming) return
     setInput('')
-    lastRunGoal.current = ''
+    directInputRef.current = true
+    lastRunGoal.current = goal
     runGoal(goal)
   }
 
@@ -129,7 +168,9 @@ export default function Agent() {
                   className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-sm leading-relaxed ${
                     msg.role === 'user'
                       ? 'bg-ink text-cream rounded-br-md'
-                      : 'bg-white border border-border-faint text-ink-soft rounded-bl-md'
+                      : msg.type === 'progress'
+                        ? 'bg-transparent text-ink-muted/60 text-xs px-2 py-1 italic'
+                        : 'bg-white border border-border-faint text-ink-soft rounded-bl-md'
                   }`}
                 >
                   {msg.content || (

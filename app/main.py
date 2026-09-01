@@ -7,8 +7,10 @@ from fastapi import FastAPI
 
 from service.api import (  # noqa: E402
     agent_router,
+    approval_router,
     audit_router,
     catalog_router,
+    checkout_page_router,
     checkout_router,
     webhooks_router,
 )
@@ -32,8 +34,10 @@ app = FastAPI(
 )
 
 app.include_router(agent_router)
+app.include_router(approval_router)
 app.include_router(catalog_router)
 app.include_router(checkout_router)
+app.include_router(checkout_page_router)
 app.include_router(webhooks_router)
 app.include_router(audit_router)
 

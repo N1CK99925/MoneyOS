@@ -16,6 +16,7 @@ from ..db.models import CheckoutSession as CheckoutSessionRow
 from ..razorpay_client.orders import create_order, fetch_order, poll_order_status
 from ..razorpay_client.payments import fetch_payment
 from ..settings import settings
+from .approval import start_approval
 from .catalog import _load_catalog
 
 logger = logging.getLogger(__name__)
@@ -156,6 +157,36 @@ def create_checkout_session(body: CreateCheckoutRequest, db: Session = Depends(g
         })
         total += line_total
 
+    # --- Spend policy (bounded spend) — enforced BEFORE creating any order. ---
+    policy_max = settings.spend_policy_max_per_transaction_paise
+    if policy_max > 0 and total > policy_max:
+        write_audit_row(
+            db,
+            actor="policy",
+            action="policy_rejected",
+            entity_type="checkout_session",
+            payload={
+                "total_paise": total,
+                "policy_max_paise": policy_max,
+                "buyer_agent_id": body.buyer_agent_id,
+                "item_ids": [i["id"] for i in items_out],
+            },
+            result="failure",
+            error_reason=f"exceeds max_per_transaction {policy_max}",
+        )
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "policy_violation",
+                "message": (
+                    f"Order ₹{total / 100:,.2f} exceeds the spend limit of "
+                    f"₹{policy_max / 100:,.2f} for this buyer agent."
+                ),
+                "total_paise": total,
+                "policy_max_paise": policy_max,
+            },
+        )
+
     receipt = f"checkout_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
     razorpay_order = create_order(amount_paise=total, receipt=receipt)
     session_id = razorpay_order["id"]
@@ -249,30 +280,10 @@ def complete_checkout(
         )
 
     if order_status == "paid":
-        payment_info = _fetch_order_payments(order)
-        session["status"] = "completed"
-        _save_session(db, session)
-
-        write_audit_row(
-            db,
-            actor="service",
-            action="checkout_completed",
-            entity_type="checkout_session",
-            entity_id=session_id,
-            payload={
-                "razorpay_order_id": order_id,
-                "payment_id": payment_info.get("id"),
-                "payment_status": payment_info.get("status"),
-                "amount_paise": session["total_paise"],
-            },
-            result="success",
-        )
-        return {
-            "session_id": session_id,
-            "status": "completed",
-            "razorpay_order_id": order_id,
-            "message": "Payment confirmed",
-        }
+        # Payment is authorized on Razorpay. Per the gated-payments design,
+        # we do NOT capture yet — we enter the human approval hold and return
+        # an approval URL. Capture happens only on explicit human approval.
+        return start_approval(db, session)
 
     raise HTTPException(
         status_code=400,

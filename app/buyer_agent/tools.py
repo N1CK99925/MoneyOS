@@ -1,4 +1,10 @@
-"""Buyer agent tools — HTTP calls to the merchant agent API."""
+"""Buyer agent tools — HTTP calls to the merchant agent API.
+
+Modular design:
+- Catalog + checkout tools live here (HTTP-based, talk to the merchant API).
+- Payment tools (payment link, test card) live in ``payment_tools.py``.
+- Both are re-exported via ``TOOL_DEFINITIONS`` and ``TOOL_FUNCTIONS``.
+"""
 
 from __future__ import annotations
 
@@ -10,10 +16,16 @@ import httpx
 
 from service.settings import settings
 
+from .payment_tools import PAYMENT_TOOL_DEFINITIONS, PAYMENT_TOOL_FUNCTIONS
+
 logger = logging.getLogger(__name__)
 
 _BASE = settings.service_url.rstrip("/")
 
+
+# ---------------------------------------------------------------------------
+# HTTP helpers
+# ---------------------------------------------------------------------------
 
 def _post(path: str, body: dict[str, Any]) -> dict[str, Any]:
     try:
@@ -73,7 +85,11 @@ def create_checkout_session(items: list[dict[str, Any]], buyer_agent_id: str = "
 
 
 def complete_checkout(session_id: str) -> str:
-    """Complete payment for a checkout session. Uses polling fallback if webhook is delayed."""
+    """Complete payment for a checkout session.
+
+    Uses polling fallback if webhook is delayed.
+    Only succeeds after the Razorpay order has been paid (via payment link or test card).
+    """
     result = _post(f"/api/checkout_sessions/{session_id}/complete?poll=true", {})
     return json.dumps(result)
 
@@ -91,10 +107,10 @@ def get_checkout_session(session_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Tool definitions (OpenAI function-calling schema for litellm)
+# Catalog + checkout tool definitions (OpenAI function-calling schema)
 # ---------------------------------------------------------------------------
 
-TOOL_DEFINITIONS: list[dict[str, Any]] = [
+_CATALOG_CHECKOUT_DEFINITIONS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
@@ -155,8 +171,10 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "function": {
             "name": "complete_checkout",
             "description": (
-                "Complete payment for a checkout session. Verifies payment on Razorpay "
-                "and confirms the order."
+                "Verify payment and start the human approval flow. The order must "
+                "be PAID on Razorpay before calling this (use get_payment_link or "
+                "pay_with_test_card first). If the result has status "
+                "'pending_approval', STOP and report the approval_url to the user."
             ),
             "parameters": {
                 "type": "object",
@@ -209,11 +227,22 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
 ]
 
-# Map tool names to callables
+# ---------------------------------------------------------------------------
+# Combined exports — all tools from catalog/checkout + payment modules
+# ---------------------------------------------------------------------------
+
+# OpenAI function-calling schemas (catalog + checkout + payment)
+TOOL_DEFINITIONS: list[dict[str, Any]] = [
+    *_CATALOG_CHECKOUT_DEFINITIONS,
+    *PAYMENT_TOOL_DEFINITIONS,
+]
+
+# Tool name → callable mapping
 TOOL_FUNCTIONS: dict[str, Any] = {
     "search_catalog": search_catalog,
     "create_checkout_session": create_checkout_session,
     "complete_checkout": complete_checkout,
     "cancel_checkout": cancel_checkout,
     "get_checkout_session": get_checkout_session,
+    **PAYMENT_TOOL_FUNCTIONS,
 }

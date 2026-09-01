@@ -39,11 +39,12 @@ def db_session():
 @pytest.fixture
 def client():
     """Yield a TestClient with DB dependency overridden."""
-    from service.api import audit_router, catalog_router, checkout_router
+    from service.api import approval_router, audit_router, catalog_router, checkout_router
 
     app = FastAPI()
     app.include_router(catalog_router)
     app.include_router(checkout_router)
+    app.include_router(approval_router)
     app.include_router(audit_router)
 
     def override_get_db():

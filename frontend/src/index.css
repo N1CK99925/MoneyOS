@@ -136,20 +136,26 @@
   }
 
   ::-webkit-scrollbar {
-    width: 6px;
+    width: 5px;
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-cream-dark);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--color-border-warm);
+    background: #c4bdb2;
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-sage);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #c4bdb2 transparent;
   }
 }
 

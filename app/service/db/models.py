@@ -37,3 +37,8 @@ class CheckoutSession(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="ready_for_payment")
     buyer_agent_id: Mapped[str] = mapped_column(String(100), nullable=False, default="anonymous")
     created_at: Mapped[str] = mapped_column(String(35), nullable=False)
+
+    # Approval-flow fields (gated payments). Nullable so pre-existing rows are valid.
+    approval_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    approval_deadline: Mapped[str | None] = mapped_column(String(35), nullable=True)
+    approval_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

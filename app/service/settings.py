@@ -54,5 +54,18 @@ class Settings(BaseSettings):
         description="Brave Search API key for web search (free tier: 2000 queries/mo)",
     )
 
+    # Spend policy — bounded spend (Phase: gated payments).
+    # Demo policy: single per-transaction cap, in paise. No rolling windows.
+    spend_policy_max_per_transaction_paise: int = Field(
+        default=60000,
+        description="Max per-transaction spend (paise). 0 disables the policy check.",
+    )
+
+    # Approval flow — gated payments.
+    approval_ttl_seconds: int = Field(
+        default=300,
+        description="Seconds a pending approval token stays valid before expiring.",
+    )
+
 
 settings = Settings()

@@ -8,7 +8,7 @@ function AppRoutes() {
   const location = useLocation()
   const isHome = location.pathname === '/'
   return (
-    <Layout shaderOpacity={isHome ? 1.0 : 0.3}>
+    <Layout shaderOpacity={isHome ? 1.0 : 0.5}>
       <Routes location={location}>
         <Route path="/" element={<Home />} />
         <Route path="/catalog" element={<Catalog />} />

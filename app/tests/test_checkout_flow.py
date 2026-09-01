@@ -100,8 +100,9 @@ class TestCompleteCheckout:
         resp = client.post("/api/checkout_sessions/order_test123/complete")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "completed"
-        assert data["message"] == "Payment confirmed"
+        # Gated payments: complete now enters a human approval hold, not immediate completion.
+        assert data["status"] == "pending_approval"
+        assert "/api/approval/" in data["approval_url"]
 
     @patch("service.api.checkout.fetch_order")
     @patch("service.api.checkout.create_order")
