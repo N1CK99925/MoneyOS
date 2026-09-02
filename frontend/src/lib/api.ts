@@ -77,6 +77,25 @@ export async function fetchAuditLog(limit = 50) {
   return res.json()
 }
 
+export async function fetchSettings() {
+  const res = await fetch(`${API_BASE}/settings`)
+  if (!res.ok) throw new Error('Failed to fetch settings')
+  return res.json()
+}
+
+export async function updateSetting(key: string, value: string) {
+  const res = await fetch(`${API_BASE}/settings/${key}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => null)
+    throw new Error(err?.detail || `Failed to update ${key}`)
+  }
+  return res.json()
+}
+
 export function streamAgentRun(
   goal: string,
   onMessage: (data: string, type?: 'message' | 'progress') => void,

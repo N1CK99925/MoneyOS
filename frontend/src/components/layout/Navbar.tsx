@@ -8,6 +8,7 @@ const navLinks = [
   { to: '/', label: 'Home' },
   { to: '/catalog', label: 'Catalog' },
   { to: '/audit', label: 'Audit' },
+  { to: '/settings', label: 'Settings' },
 ]
 
 export default function Navbar() {
@@ -18,7 +19,7 @@ export default function Navbar() {
   return (
     <>
       {/* ── Floating glass pill nav ── */}
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[640px]">
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[720px]">
         <div className="relative flex items-center justify-between rounded-full bg-cream/80 backdrop-blur-xl border border-border-faint px-5 py-3 shadow-nav transition-all duration-700 ease-spring">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group" onClick={() => setOpen(false)}>
@@ -38,7 +39,7 @@ export default function Navbar() {
               <Link
                 key={link.to}
                 to={link.to}
-                className={`relative px-4 py-2 rounded-full text-sm font-medium transition-all duration-500 ease-spring ${location.pathname === link.to
+                className={`relative px-3 py-2 rounded-full text-sm font-medium transition-all duration-500 ease-spring ${location.pathname === link.to
                   ? 'text-ink'
                   : 'text-ink-muted hover:text-ink'
                   }`}
@@ -92,7 +93,7 @@ export default function Navbar() {
 
       {/* ── Mobile menu ── */}
       <div
-        className={`fixed inset-x-0 top-0 z-35 pt-28 pb-8 px-6 bg-cream/95 backdrop-blur-3xl border-b border-border-faint shadow-dropdown transition-all duration-700 ease-spring md:hidden ${open
+        className={`fixed inset-x-0 top-0 z-50 pt-28 pb-8 px-6 bg-cream/95 backdrop-blur-3xl border-b border-border-faint shadow-dropdown transition-all duration-700 ease-spring md:hidden ${open
           ? 'translate-y-0 opacity-100 pointer-events-auto'
           : '-translate-y-full opacity-0 pointer-events-none'
           }`}

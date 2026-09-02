@@ -1,4 +1,4 @@
-"""Phase 4B — Brave Search API integration for web search."""
+"""Phase 4B — Tavily Search API integration for web search."""
 
 from __future__ import annotations
 
@@ -11,50 +11,49 @@ from service.settings import settings
 
 logger = logging.getLogger(__name__)
 
-BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
+TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 
 
-def brave_search(query: str, *, count: int = 5) -> list[dict[str, Any]]:
-    """Search the web using Brave Search API.
+def tavily_search(query: str, *, count: int = 5) -> list[dict[str, Any]]:
+    """Search the web using Tavily Search API.
 
     Returns a list of result dicts with keys: title, url, snippet, rating, review_count.
     Only web results are returned (no news, images, etc.).
     """
-    api_key = settings.brave_api_key
+    api_key = settings.tavily_api_key
     if not api_key:
-        logger.warning("BRAVE_API_KEY not set — returning empty results")
+        logger.warning("TAVILY_API_KEY not set — returning empty results")
         return []
 
-    headers = {
-        "Accept": "application/json",
-        "Accept-Encoding": "gzip",
-        "X-Subscription-Token": api_key,
+    payload = {
+        "query": query,
+        "max_results": count,
+        "api_key": api_key,
     }
 
     try:
-        resp = httpx.get(
-            BRAVE_SEARCH_URL,
-            headers=headers,
-            params={"q": query, "count": count},
+        resp = httpx.post(
+            TAVILY_SEARCH_URL,
+            json=payload,
             timeout=15,
         )
         resp.raise_for_status()
         data = resp.json()
     except httpx.HTTPStatusError as e:
-        logger.error("Brave Search returned %d: %s", e.response.status_code, e.response.text[:200])
+        logger.error("Tavily Search returned %d: %s", e.response.status_code, e.response.text[:200])
         return []
     except httpx.RequestError as e:
-        logger.error("Brave Search request failed: %s", e)
+        logger.error("Tavily Search request failed: %s", e)
         return []
 
-    web_results = data.get("web", {}).get("results", [])
+    web_results = data.get("results", [])
     return [
         {
             "title": r.get("title", ""),
             "url": r.get("url", ""),
-            "snippet": r.get("description", ""),
-            "rating": r.get("rating"),
-            "review_count": r.get("review_count"),
+            "snippet": r.get("content", ""),
+            "rating": r.get("score"),
+            "review_count": None,
         }
         for r in web_results
     ]
@@ -67,4 +66,4 @@ def search_food_reviews(item_name: str) -> list[dict[str, Any]]:
     review data from food delivery sites, blogs, and review aggregators.
     """
     query = f"{item_name} reviews rating"
-    return brave_search(query, count=8)
+    return tavily_search(query, count=8)

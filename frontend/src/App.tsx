@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { GoalProvider } from '@/hooks'
 import { Layout } from '@/components/layout'
 import GoalIndicator from '@/components/ui/GoalIndicator'
-import { Home, Catalog, Agent, Audit } from '@/pages'
+import { Home, Catalog, Agent, Audit, Settings } from '@/pages'
 
 function AppRoutes() {
   const location = useLocation()
@@ -14,6 +14,7 @@ function AppRoutes() {
         <Route path="/catalog" element={<Catalog />} />
         <Route path="/agent" element={<Agent />} />
         <Route path="/audit" element={<Audit />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
       <GoalIndicator />
     </Layout>

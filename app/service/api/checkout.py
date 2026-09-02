@@ -15,6 +15,7 @@ from ..db import get_db, write_audit_row
 from ..db.models import CheckoutSession as CheckoutSessionRow
 from ..razorpay_client.orders import create_order, fetch_order, poll_order_status
 from ..razorpay_client.payments import fetch_payment
+from ..runtime_settings import get_spend_policy_max
 from ..settings import settings
 from .approval import start_approval
 from .catalog import _load_catalog
@@ -158,7 +159,7 @@ def create_checkout_session(body: CreateCheckoutRequest, db: Session = Depends(g
         total += line_total
 
     # --- Spend policy (bounded spend) — enforced BEFORE creating any order. ---
-    policy_max = settings.spend_policy_max_per_transaction_paise
+    policy_max = get_spend_policy_max()
     if policy_max > 0 and total > policy_max:
         write_audit_row(
             db,

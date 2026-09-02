@@ -25,6 +25,16 @@ class AuditLog(Base):
     signed_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    updated_at: Mapped[str] = mapped_column(String(35), nullable=False)
+
+
 class CheckoutSession(Base):
     __tablename__ = "checkout_session"
 

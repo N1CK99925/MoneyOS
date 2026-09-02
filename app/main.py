@@ -12,6 +12,7 @@ from service.api import (  # noqa: E402
     catalog_router,
     checkout_page_router,
     checkout_router,
+    settings_router,
     webhooks_router,
 )
 from service.db import init_db  # noqa: E402
@@ -35,9 +36,11 @@ app = FastAPI(
 
 app.include_router(agent_router)
 app.include_router(approval_router)
+app.include_router(audit_router)
 app.include_router(catalog_router)
 app.include_router(checkout_router)
 app.include_router(checkout_page_router)
+app.include_router(settings_router)
 app.include_router(webhooks_router)
 app.include_router(audit_router)
 

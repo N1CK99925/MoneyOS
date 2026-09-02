@@ -39,3 +39,11 @@ export interface AuditEntry {
   error_reason?: string
   signed_hash?: string
 }
+
+export interface SystemSetting {
+  key: string
+  value: string
+  default: string
+  description: string
+  updated_at: string
+}
