@@ -13,18 +13,27 @@ from service.api import (  # noqa: E402
     checkout_page_router,
     checkout_router,
     settings_router,
+    telegram_router,
     webhooks_router,
 )
 from service.db import init_db  # noqa: E402
+from service.mobile_delivery.polling import PollingConsumer  # noqa: E402
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+_polling = PollingConsumer()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: create DB tables. Shutdown: nothing special."""
+    """Startup: create DB tables, start Telegram polling. Shutdown: stop polling."""
     init_db()
+    _polling.start()
     yield
+    try:
+        _polling.stop()
+    except Exception:  # noqa: BLE001 — shutdown must not raise
+        pass
 
 
 app = FastAPI(
@@ -41,6 +50,7 @@ app.include_router(catalog_router)
 app.include_router(checkout_router)
 app.include_router(checkout_page_router)
 app.include_router(settings_router)
+app.include_router(telegram_router)
 app.include_router(webhooks_router)
 app.include_router(audit_router)
 

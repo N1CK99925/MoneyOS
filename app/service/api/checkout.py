@@ -17,6 +17,7 @@ from ..razorpay_client.orders import create_order, fetch_order, poll_order_statu
 from ..razorpay_client.payments import fetch_payment
 from ..runtime_settings import get_spend_policy_max
 from ..settings import settings
+from ..mobile_delivery import send_payment_link
 from .approval import start_approval
 from .catalog import _load_catalog
 
@@ -216,6 +217,16 @@ def create_checkout_session(body: CreateCheckoutRequest, db: Session = Depends(g
             "razorpay_order_id": razorpay_order["id"],
         },
         result="success",
+    )
+
+    # Push the payment link to the customer's Telegram (config-gated,
+    # non-blocking). The /pay/{session_id} page is built on request, so we
+    # just hand over the session ID and amount for the message.
+    send_payment_link(
+        session_id=session_id,
+        checkout_url=f"{settings.service_url.rstrip('/')}/pay/{session_id}",
+        amount_paise=total,
+        item_name=(items_out[0].get("name") if len(items_out) == 1 else None),
     )
 
     return _session_response(session_data)

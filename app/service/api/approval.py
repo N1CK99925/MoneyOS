@@ -19,6 +19,7 @@ from ..db.models import CheckoutSession
 from ..razorpay_client.orders import cancel_order, fetch_order
 from ..razorpay_client.payments import capture_payment
 from ..settings import settings
+from ..mobile_delivery import send_approval_card
 
 router = APIRouter(prefix="/api", tags=["approval"])
 
@@ -76,6 +77,18 @@ def start_approval(db: Session, session: dict[str, Any]) -> dict[str, Any]:
         },
         result="pending",
     )
+
+    # Notify the merchant on Telegram (config-gated, non-blocking).
+    # Buttons carry the short session id (not the 64-char token) to stay under
+    # Telegram's 64-byte callback_data limit; resolved back to the token by the
+    # by-session endpoints below.
+    send_approval_card(
+        session_id=session["session_id"],
+        items=session.get("items"),
+        total_paise=session["total_paise"],
+        approval_url=url,
+    )
+
     return _approval_context(session, token, deadline)
 
 
@@ -332,7 +345,11 @@ def deny(token: str, db: Session = Depends(get_db)):
         row = _resolve_token(db, token)
     except HTTPException:
         raise
+    return _deny_row(db, row)
 
+
+def _deny_row(db: Session, row: CheckoutSession) -> dict[str, Any]:
+    """Shared deny logic given a resolved session row."""
     cancel_order(row.razorpay_order_id)
 
     row.status = "denied"
@@ -354,3 +371,37 @@ def deny(token: str, db: Session = Depends(get_db)):
         "razorpay_order_id": row.razorpay_order_id,
         "message": "Purchase denied",
     }
+
+
+def _load_by_session(db: Session, session_id: str) -> CheckoutSession | None:
+    """Return the session row for a session id, or None."""
+    return db.query(CheckoutSession).filter_by(session_id=session_id).first()
+
+
+@router.post("/approval/by-session/{session_id}/approve")
+def approve_by_session(session_id: str, db: Session = Depends(get_db)):
+    """Approve a pending checkout addressed by session id (Telegram buttons).
+
+    Resolves the session's single-use approval token and approves it.
+    """
+    row = _load_by_session(db, session_id)
+    if row is None or not row.approval_token:
+        raise HTTPException(status_code=404, detail="Approval session not found")
+    try:
+        resolved = _resolve_token(db, row.approval_token)
+    except HTTPException:
+        raise
+    return _finalize_approved(db, resolved)
+
+
+@router.post("/approval/by-session/{session_id}/deny")
+def deny_by_session(session_id: str, db: Session = Depends(get_db)):
+    """Deny a pending checkout addressed by session id (Telegram buttons)."""
+    row = _load_by_session(db, session_id)
+    if row is None or not row.approval_token:
+        raise HTTPException(status_code=404, detail="Approval session not found")
+    try:
+        resolved = _resolve_token(db, row.approval_token)
+    except HTTPException:
+        raise
+    return _deny_row(db, resolved)

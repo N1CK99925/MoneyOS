@@ -48,6 +48,20 @@ class Settings(BaseSettings):
         description="Base URL of the merchant agent API",
     )
 
+    # Telegram Bot — mobile delivery of payment links and approval cards.
+    telegram_bot_token: str = Field(
+        default="",
+        description="Telegram bot token from @BotFather",
+    )
+    telegram_merchant_chat_id: str = Field(
+        default="",
+        description="Merchant Telegram chat ID for approval card delivery",
+    )
+    telegram_customer_chat_id: str = Field(
+        default="",
+        description="Customer Telegram chat ID for payment link delivery (blank = same as merchant)",
+    )
+
     # Tavily Search (for Phase 4B stretch agent)
     tavily_api_key: str = Field(
         default="",

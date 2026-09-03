@@ -7,6 +7,7 @@ from .catalog import router as catalog_router
 from .checkout import router as checkout_router
 from .checkout_page import router as checkout_page_router
 from .settings import router as settings_router
+from .telegram import router as telegram_router
 from .webhooks import router as webhooks_router
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "checkout_page_router",
     "checkout_router",
     "settings_router",
+    "telegram_router",
     "webhooks_router",
 ]
