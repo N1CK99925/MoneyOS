@@ -140,20 +140,19 @@ def checkout_page(session_id: str, db: Session = Depends(get_db)) -> Response:
       status.style.display = 'block';
       status.innerHTML = '✅ Payment successful — finalizing order…';
 
-      // Auto-complete the checkout so the approval flow triggers
+      // Auto-complete the checkout to finalize the order
       fetch('/api/checkout_sessions/{session_id}/complete?poll=true', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
       }})
         .then(function(r) {{ return r.json(); }})
         .then(function(data) {{
-          if (data.status === 'pending_approval') {{
-            status.className = 'pending';
-            status.innerHTML = '⏳ Order submitted for approval.<br>'
-              + (data.approval_url ? '<a href="' + data.approval_url + '" style="color:#856404">Open approval page</a>' : '');
-          }} else if (data.status === 'completed') {{
+          if (data.status === 'completed') {{
             status.className = 'success';
             status.innerHTML = '✅ Order confirmed! Payment ID: ' + resp.razorpay_payment_id;
+          }} else if (data.status === 'awaiting_payment') {{
+            status.className = 'pending';
+            status.innerHTML = '⏳ Payment authorized — finalizing…';
           }} else {{
             status.className = 'success';
             status.innerHTML = '✅ Payment received. Status: ' + data.status;

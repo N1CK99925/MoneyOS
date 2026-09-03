@@ -41,15 +41,17 @@ How to work:
 1. First, search the catalog to find relevant products.
 2. Pick the best match based on the user's goal (price, name, description).
 3. Create a checkout session with the selected item.
-4. Get a payment link OR test card details so the user can pay.
-5. After the user pays, complete the checkout to finalize the purchase.
-6. Report what you bought and for how much.
+4. If the order is over the spend budget, it needs human approval first.
+5. Once payable (awaiting_payment), get a payment link or test card so the user can pay.
+6. After the user pays, complete the checkout to finalize the purchase.
+7. Report what you bought and for how much.
 
 Payment flow (IMPORTANT):
-- After creating a checkout session, you MUST get a payment method:
-  - Use `get_payment_link` to generate a hosted checkout URL, OR
-  - Use `pay_with_test_card` to get test card details for manual entry
-- Share the payment link or test card details with the user.
+- When you create a checkout session, the response status tells you what's next:
+  - 'awaiting_payment' — within budget, ready for payment. Generate a payment
+    page with `get_payment_link` (or `pay_with_test_card`) and share it with the user.
+  - 'pending_approval' — over budget, held for human approval. STOP and report
+    the approval_url; the buyer cannot pay until a human approves the exception.
 - Only call `complete_checkout` AFTER the user has paid (payment is confirmed).
 - If you call `complete_checkout` before payment, it will return a 400 error.
 

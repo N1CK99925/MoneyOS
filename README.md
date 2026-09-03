@@ -2,41 +2,49 @@
 
 > AI-powered merchant service with ACP-style checkout on Razorpay test mode.
 
-MoneyOS lets **AI buyers autonomously discover products, initiate checkout, and pay**, while a deterministic merchant **service** handles the storefront and payment lifecycle, and a human authorizes every capture. Built for the Razorpay Buildathon — AI Growth & Agentic Commerce track.
+MoneyOS lets **AI buyers autonomously discover products and orchestrate checkout**, while a deterministic merchant **service** handles the storefront and payment lifecycle, enforces a spend boundary, and gates over-budget purchases behind human approval. Built for the Razorpay Buildathon — AI Growth & Agentic Commerce track.
 
 The architecture separates **one agent from one service**:
 
-- **Merchant Service** (FastAPI) — deterministic. No LLM. Exposes a catalog, handles checkout, enforces spend policy, runs the human-approval gate, and mirrors every money mutation to a tamper-evident audit trail.
+- **Merchant Service** (FastAPI) — deterministic. No LLM. Exposes a catalog, handles checkout, enforces the spend policy, gates over-budget exceptions behind human approval, and mirrors every money mutation to a tamper-evident audit trail.
 - **Buyer Agent** (LLM via LiteLLM) — the only agent. Reads the catalog, picks a product from a natural-language goal, and drives the create → pay → complete loop over HTTP.
+
+**The AI buyer orchestrates the purchase; MoneyOS enforces the spending boundary and controls when human authorization is required.** The AI never authorizes money movement by itself — that is owned by the policy engine and (for exceptions) a human.
 
 Two independent processes talking over HTTP. Either side could be swapped for a real external system without rewriting the other.
 
 ---
 
-## Transaction Lifecycle (Gated)
+## Transaction Lifecycle (Bounded & Gated)
+
+Human approval is reserved for **policy exceptions** (over-budget orders). Within-budget purchases go straight to payment; over-budget purchases are held until a human approves the exception.
 
 ```
-Buyer Agent             Merchant Service (FastAPI)          Razorpay Test API
-----------------------------------------
-search_catalog  ──────>  GET /api/catalog
-create_checkout ──────>  POST /api/checkout_sessions        create_order
-                         [SPEND POLICY CHECKED — 403 if over cap, no order]
-get_payment_link ─────>  /pay/{session_id}                  checkout.js
-complete_checkout ────>  POST .../complete                  verify payment
-                         status → pending_approval
-                         returns approval_url
-Human (merchant) opens approval_url
-  ────────────────>      POST /api/approval/{token}/approve → capture_payment
-                         status → completed                 capture_payment
-  ────────────────>      POST /api/approval/{token}/deny   → cancel_order
-                         status → denied
-Buyer Agent polls status → reports outcome to user
+ Buyer Agent             Merchant Service (FastAPI)          Razorpay Test API
+ ----------------------------------------
+ search_catalog  ──────>  GET /api/catalog
+ create_checkout ──────>  POST /api/checkout_sessions        create_order
+                          [SPEND POLICY — over cap?]
+                          ├── within budget → status: awaiting_payment
+                          │       get_payment_link ─────>  /pay/{session_id}   checkout.js
+                          │       complete_checkout ────>  POST .../complete   verify payment
+                          │       status → completed
+                          │
+                          └── over budget → status: pending_approval (no payment link)
+                                  Human approves exception
+                                   ────────────────>  POST /api/approval/{token}/approve
+                                                       status → awaiting_payment (payment released)
+                                  ────────────────>  POST /api/approval/{token}/deny   → cancel_order
+                                                       status → denied
+                                  then buyer pays as above → completed
+ Buyer Agent polls status → reports outcome to user
 ```
 
-Two rules anchor the design:
+Three rules anchor the design:
 
-1. **The buyer agent never captures.** It can only put money on hold and hand back a URL. Only a human can authorize the capture.
-2. **Every money mutation writes an audit row** (HMAC-SHA256 signed, append-only).
+1. **The buyer agent never authorizes capture.** Within budget, the spend policy is the authority; over budget, a human must approve the exception before the buyer is even handed a payment link.
+2. **Human approval precedes, not follows, payment.** It gates entry to the payable state for exceptions — there is no "pay → then approve → then capture" in the loop.
+3. **Every money mutation writes an audit row** (HMAC-SHA256 signed, append-only).
 
 ---
 
@@ -181,16 +189,16 @@ Frontend: `cd frontend && npm run dev` → open http://localhost:5173
 |--------|------|-------------|
 | `GET` | `/health` | Health check |
 | `GET` | `/api/catalog` | Merchant product catalog |
-| `POST` | `/api/checkout_sessions` | Create checkout session (spend policy enforced) |
+| `POST` | `/api/checkout_sessions` | Create checkout session (spend policy + approval gate evaluated) |
 | `GET` | `/api/checkout_sessions/{id}` | Get session status |
-| `POST` | `/api/checkout_sessions/{id}/complete` | Verify payment & start approval hold (`poll=true` fallback) |
-| `POST` | `/api/checkout_sessions/{id}/cancel` | Cancel session |
+| `POST` | `/api/checkout_sessions/{id}/complete` | Verify payment & mark completed (`poll=true` fallback) |
+| `POST` | `/api/checkout_sessions/{id}/cancel` | Cancel session + underlying Razorpay order |
 | `POST` | `/api/checkout_sessions/{id}/fail` | Mark session as failed |
 | `GET` | `/api/razorpay_key` | Get publishable key (for frontend checkout) |
 | `GET` | `/pay/{session_id}` | Razorpay checkout.js page for a session |
-| `GET` | `/api/approval/{token}` | Human approval page (Approve/Deny) |
-| `POST` | `/api/approval/{token}/approve` | Approve — capture payment |
-| `POST` | `/api/approval/{token}/deny` | Deny — cancel order |
+| `GET` | `/api/approval/{token}` | Human approval page (Approve/Deny) for over-budget exceptions |
+| `POST` | `/api/approval/{token}/approve` | Approve exception — release payment (no capture) |
+| `POST` | `/api/approval/{token}/deny` | Deny exception — cancel order |
 | `GET` | `/api/audit` | View audit trail (newest first, `limit` param) |
 | `GET` | `/api/settings` | List runtime settings |
 | `GET` / `PUT` | `/api/settings/{key}` | Get / update a runtime setting |
@@ -220,40 +228,39 @@ The agent autonomously:
 1. Searches the catalog
 2. Picks the best match
 3. Creates a checkout session
-4. Gets a payment link or test card
-5. Completes the checkout → enters human approval hold
-6. Reports what it bought and the approval URL
+4. If within budget → gets a payment link or test card → user pays → completes
+5. If over budget → reports the approval_url and waits for a human to approve the exception → then proceeds to payment
+6. Reports what it bought and for how much
 
-### Stretch Agent (web search + scoring)
+### Stretch Agent (web search)
 
-In the frontend, toggle **Research ON** or set `stretch: true` on `POST /api/agent/run`. The stretch agent adds a `search_and_score` tool — it searches Tavily for real reviews and picks the highest-rated item with enough reviews (falling back to cheapest when no review data exists).
+In the frontend, toggle **Research ON** or set `stretch: true` on `POST /api/agent/run`. The stretch agent adds a `search_and_score` tool that searches the web for context on candidate items. Note: the current web-search source (Tavily) does not return structured consumer ratings or review counts, so the deterministic scorer falls back to the cheapest match when no review data exists — the scoring logic is honest about that limitation rather than fabricating a rating from a relevance score.
 
 ---
 
 ## Spend Policy & Approval Flow
 
 ### Spend Policy (bounded spend)
-- Enforced in `create_checkout_session`, **before** creating a Razorpay order.
+- Evaluated in `create_checkout_session`.
 - Default cap ₹600 (`spend_policy_max_per_transaction_paise` = 60000).
-- On violation: `403 policy_violation` + audit row `policy_rejected`, **no order created**.
-- Set to `0` to disable.
+- **Within budget:** the order proceeds straight to `awaiting_payment` — no approval needed.
+- **Over budget:** the order is flagged `policy_flagged` and enters `pending_approval`; the buyer is **not** handed a payment link until a human approves the exception.
+- Set to `0` to disable (everything is payable immediately).
 
-### Approval Flow (gated capture)
-- The buyer agent can only hold money, never capture it. A human must click Approve.
+### Approval Flow (gate for exceptions)
+- Approval happens **before** money moves, and only for over-budget exceptions.
 - Token: 32 random bytes, single-use, TTL 5 min (configurable).
-- Approve → `capture_payment` → `completed`. Deny → `cancel_order` → `denied`.
+- Approve → releases the order to `awaiting_payment` (payment link sent). Deny → `cancel_order` → `denied`. Expired → `cancel_order` → `expired_approval`.
 - Idempotent, expiry-aware, fully audit-logged.
 
----
+### Audit Trail
 
-## Audit Trail
-
-Single write path (`write_audit_row`). Every row is HMAC-SHA256 signed and append-only (no UPDATE/DELETE).
+Single write path (`write_audit_row`). Every row is HMAC-SHA256 signed and append-only (no UPDATE/DELETE). Note this is an **HMAC-signed, append-only application audit log** — the HMAC detects tampering with an individual row's contents, not deletion/reordering of rows at the database level.
 
 | Actor | Actions |
 |-------|---------|
-| `service` | checkout_session_created, approval_requested, approval_expired, checkout_completed, checkout_failed, checkout_canceled |
-| `policy` | policy_rejected |
+| `service` | checkout_session_created, approval_requested, approval_granted, approval_expired, payment_link_ready, checkout_completed, checkout_failed, checkout_canceled |
+| `policy` | policy_flagged |
 | `human_approval` | approval_granted, approval_denied |
 | `razorpay_webhook` | payment.captured, payment.failed, order.paid, order.failed, etc. |
 

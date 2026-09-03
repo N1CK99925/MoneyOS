@@ -13,11 +13,11 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db, write_audit_row
 from ..db.models import CheckoutSession as CheckoutSessionRow
-from ..razorpay_client.orders import create_order, fetch_order, poll_order_status
+from ..mobile_delivery import send_payment_link
+from ..razorpay_client.orders import cancel_order, create_order, fetch_order, poll_order_status
 from ..razorpay_client.payments import fetch_payment
 from ..runtime_settings import get_spend_policy_max
 from ..settings import settings
-from ..mobile_delivery import send_payment_link
 from .approval import start_approval
 from .catalog import _load_catalog
 
@@ -55,6 +55,8 @@ class CheckoutSessionResponse(BaseModel):
     currency: str
     status: str
     created_at: str
+    approval_url: str | None = None
+    approval_deadline: str | None = None
 
 
 def _build_catalog_index() -> dict[str, dict]:
@@ -159,35 +161,12 @@ def create_checkout_session(body: CreateCheckoutRequest, db: Session = Depends(g
         })
         total += line_total
 
-    # --- Spend policy (bounded spend) — enforced BEFORE creating any order. ---
+    # --- Spend policy (bounded spend) — the human gate, evaluated at create. ---
+    # Over-budget orders do NOT get rejected outright; they enter human
+    # approval first and only become payable once a human approves the
+    # exception. Within-budget orders proceed straight to a payable state.
     policy_max = get_spend_policy_max()
-    if policy_max > 0 and total > policy_max:
-        write_audit_row(
-            db,
-            actor="policy",
-            action="policy_rejected",
-            entity_type="checkout_session",
-            payload={
-                "total_paise": total,
-                "policy_max_paise": policy_max,
-                "buyer_agent_id": body.buyer_agent_id,
-                "item_ids": [i["id"] for i in items_out],
-            },
-            result="failure",
-            error_reason=f"exceeds max_per_transaction {policy_max}",
-        )
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "error": "policy_violation",
-                "message": (
-                    f"Order ₹{total / 100:,.2f} exceeds the spend limit of "
-                    f"₹{policy_max / 100:,.2f} for this buyer agent."
-                ),
-                "total_paise": total,
-                "policy_max_paise": policy_max,
-            },
-        )
+    over_budget = policy_max > 0 and total > policy_max
 
     receipt = f"checkout_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
     razorpay_order = create_order(amount_paise=total, receipt=receipt)
@@ -199,7 +178,7 @@ def create_checkout_session(body: CreateCheckoutRequest, db: Session = Depends(g
         "items": items_out,
         "total_paise": total,
         "currency": "INR",
-        "status": "ready_for_payment",
+        "status": "created",
         "created_at": datetime.now(UTC).isoformat(),
         "buyer_agent_id": body.buyer_agent_id,
     }
@@ -214,14 +193,38 @@ def create_checkout_session(body: CreateCheckoutRequest, db: Session = Depends(g
         payload={
             "items": [i["id"] for i in items_out],
             "total_paise": total,
+            "policy_max_paise": policy_max,
+            "over_budget": over_budget,
             "razorpay_order_id": razorpay_order["id"],
         },
         result="success",
     )
 
-    # Push the payment link to the customer's Telegram (config-gated,
-    # non-blocking). The /pay/{session_id} page is built on request, so we
-    # just hand over the session ID and amount for the message.
+    if over_budget:
+        # The spend policy is exceeded — the money must NOT move until a human
+        # approves the exception. Put the session on hold; the buyer is not yet
+        # given a payment link. Approval releases it into awaiting_payment.
+        write_audit_row(
+            db,
+            actor="policy",
+            action="policy_flagged",
+            entity_type="checkout_session",
+            entity_id=session_id,
+            payload={
+                "total_paise": total,
+                "policy_max_paise": policy_max,
+                "buyer_agent_id": body.buyer_agent_id,
+                "item_ids": [i["id"] for i in items_out],
+            },
+            result="pending",
+            error_reason=f"exceeds max_per_transaction {policy_max}",
+        )
+        return start_approval(db, session_data)
+
+    # Within budget: mark payable, hand over the payment link.
+    session_data["status"] = "awaiting_payment"
+    _save_session(db, session_data)
+
     send_payment_link(
         session_id=session_id,
         checkout_url=f"{settings.service_url.rstrip('/')}/pay/{session_id}",
@@ -291,11 +294,31 @@ def complete_checkout(
             },
         )
 
-    if order_status == "paid":
-        # Payment is authorized on Razorpay. Per the gated-payments design,
-        # we do NOT capture yet — we enter the human approval hold and return
-        # an approval URL. Capture happens only on explicit human approval.
-        return start_approval(db, session)
+    if order_status in ("paid", "captured", "authorized"):
+        # The session has reached a payable state (within budget, or approved
+        # as a policy exception) and Razorpay has authorized the payment.
+        # MoneyOS treats this as the terminal success state.
+        session["status"] = "completed"
+        _save_session(db, session)
+
+        write_audit_row(
+            db,
+            actor="service",
+            action="checkout_completed",
+            entity_type="checkout_session",
+            entity_id=session_id,
+            payload={
+                "razorpay_order_id": order_id,
+                "amount_paise": session["total_paise"],
+            },
+            result="success",
+        )
+        return {
+            "session_id": session_id,
+            "status": "completed",
+            "razorpay_order_id": order_id,
+            "message": "Payment received and order completed",
+        }
 
     raise HTTPException(
         status_code=400,
@@ -346,6 +369,16 @@ def cancel_checkout(session_id: str, db: Session = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Cancel the underlying Razorpay order too, so the API semantics match the
+    # financial reality. Razorpay only allows cancelling an unpaid order; if the
+    # order cannot be cancelled (already paid), fall back to application-level
+    # cancellation and note it in the audit trail.
+    error_reason = None
+    try:
+        cancel_order(session["razorpay_order_id"])
+    except Exception:  # noqa: BLE001 — a non-cancellable order is still cancelled in-app
+        error_reason = "underlying Razorpay order could not be cancelled (already paid?)"
+
     session["status"] = "canceled"
     _save_session(db, session)
 
@@ -356,7 +389,8 @@ def cancel_checkout(session_id: str, db: Session = Depends(get_db)):
         entity_type="checkout_session",
         entity_id=session_id,
         payload={"razorpay_order_id": session["razorpay_order_id"]},
-        result="success",
+        result="success" if error_reason is None else "failure",
+        error_reason=error_reason,
     )
 
     return {"session_id": session_id, "status": "canceled", "message": "Checkout canceled"}

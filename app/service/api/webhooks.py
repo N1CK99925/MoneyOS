@@ -29,13 +29,33 @@ def _verify_webhook_signature(body: bytes, signature: str) -> bool:
 
 
 def _update_session_status(db: Session, order_id: str, status: str) -> None:
-    """Update checkout session status by Razorpay order ID."""
+    """Update checkout session status by Razorpay order ID.
+
+    Only a session in a *payable* state (``awaiting_payment``) may be moved to
+    ``completed`` by the payment provider. This keeps Razorpay as the authority
+    over payment-provider state while MoneyOS stays the authority over business
+    state: a webhook can confirm money moved, but it can never complete a
+    session that was not authorised to accept payment.
+    """
     row = db.query(CheckoutSessionRow).filter_by(razorpay_order_id=order_id).first()
-    if row:
-        row.status = status
-        db.commit()
-    else:
+    if row is None:
         logger.warning("No checkout session found for order %s", order_id)
+        return
+
+    if status == "completed":
+        # Only release to completed from a payable state. A `pending_approval`
+        # session can NOT be completed by the webhook — MoneyOS is the only
+        # authority over approval, so the external event cannot bypass it.
+        if row.status not in ("awaiting_payment", "approved"):
+            logger.info(
+                "Ignoring captured event for order %s in status %s (not payable)",
+                order_id,
+                row.status,
+            )
+            return
+
+    row.status = status
+    db.commit()
 
 
 @router.post("/webhooks/razorpay")

@@ -185,7 +185,9 @@ export function streamAgentRun(
                 } else if (json.status === 'completed') {
                   onMessage('Payment confirmed', 'progress')
                 } else if (json.status === 'pending_approval') {
-                  onMessage('Order pending approval', 'progress')
+                  onMessage('Order over budget — pending human approval', 'progress')
+                } else if (json.status === 'awaiting_payment') {
+                  onMessage('Ready for payment', 'progress')
                 }
               } catch {
                 // ignore unparseable results

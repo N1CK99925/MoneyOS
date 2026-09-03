@@ -7,6 +7,7 @@ acceptable as a demo authorization model, see the GATED_PAYMENTS_PRD §7.
 # ruff: noqa: E501  # inline HTML approval pages contain long template lines
 from __future__ import annotations
 
+import json
 import secrets
 from datetime import UTC, datetime
 from typing import Any
@@ -16,15 +17,14 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db, write_audit_row
 from ..db.models import CheckoutSession
-from ..razorpay_client.orders import cancel_order, fetch_order
-from ..razorpay_client.payments import capture_payment
+from ..mobile_delivery import send_approval_card, send_payment_link
+from ..razorpay_client.orders import cancel_order
 from ..settings import settings
-from ..mobile_delivery import send_approval_card
 
 router = APIRouter(prefix="/api", tags=["approval"])
 
 # Statuses that terminate an approval — no further action allowed.
-_TERMINAL = {"approved", "denied", "expired_approval", "completed", "canceled", "failed"}
+_TERMINAL = {"approved", "denied", "expired_approval", "completed", "canceled", "failed", "awaiting_payment"}
 
 
 def mint_approval_token() -> str:
@@ -100,6 +100,7 @@ def _approval_context(session: dict[str, Any], token: str, deadline: str | None)
         "total_paise": session["total_paise"],
         "currency": session["currency"],
         "items": session["items"],
+        "created_at": session.get("created_at", ""),
         "approval_url": approval_url_for(token),
         "approval_deadline": deadline,
     }
@@ -130,6 +131,14 @@ def _resolve_token(db: Session, token: str) -> CheckoutSession:
         raise HTTPException(status_code=409, detail=f"Approval already decided ({row.status})")
     if _expired(row):
         row.status = "expired_approval"
+        # Release the underlying order too — MoneyOS will never let this be paid,
+        # so the Razorpay authorization/hold must be cancelled so it doesn't
+        # linger as an open order.
+        cancel_error = None
+        try:
+            cancel_order(row.razorpay_order_id)
+        except Exception:  # noqa: BLE001 — cancel failure is surfaced in the audit row
+            cancel_error = "underlying Razorpay order could not be cancelled"
         db.commit()
         write_audit_row(
             db,
@@ -139,7 +148,7 @@ def _resolve_token(db: Session, token: str) -> CheckoutSession:
             entity_id=row.session_id,
             payload={"razorpay_order_id": row.razorpay_order_id, "total_paise": row.total_paise},
             result="failure",
-            error_reason="approval deadline passed",
+            error_reason="approval deadline passed" + (f"; {cancel_error}" if cancel_error else ""),
         )
         raise HTTPException(status_code=410, detail="Approval expired")
     return row
@@ -279,9 +288,10 @@ def _render_approval_html(ctx: dict[str, Any], token: str) -> str:
         f"async function post(path){{const r=await fetch('/api/approval/{token}/'+path,{{method:'POST'}});const j=await r.json();"
         'document.body.innerHTML='
         "'<div style=\"max-width:460px;margin:0 auto;padding:3rem 2.5rem;text-align:center;font-family:Inter,system-ui,sans-serif\">'"
-        "+('<div style=\"width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.4rem;background:'+(j.status==='completed'?'#d4edda;border:2px solid #28a745':'#f8d7da;border:2px solid #dc3545')+'\">'+(j.status==='completed'?'✅':'❌')+'</div>')"
-        "+'<h1 style=\"font-family:DM Serif Display,serif;font-size:1.6rem;margin-bottom:0.5rem\">'+(j.status==='completed'?'Purchase Approved':'Purchase Denied')+'</h1>'"
+        "+('<div style=\"width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.4rem;background:'+(j.status==='awaiting_payment'?'#d4edda;border:2px solid #28a745':'#f8d7da;border:2px solid #dc3545')+'\">'+(j.status==='awaiting_payment'?'✅':'❌')+'</div>')"
+        "+'<h1 style=\"font-family:DM Serif Display,serif;font-size:1.6rem;margin-bottom:0.5rem\">'+(j.status==='awaiting_payment'?'Purchase Approved':'Purchase Denied')+'</h1>'"
         "+'<p style=\"color:#666;font-size:0.9rem\">'+(j.message||'')+'</p>'"
+        "+'<p style=\"color:#666;font-size:0.85rem;margin-top:1rem\">'+(j.approval_url?'Proceed to payment: <a href=\"'+j.approval_url+'\" style=\"color:#111\">Open payment page</a>':'')+'</p>'"
         "+'</div>'}"
         '</script>'
         '</body></html>'
@@ -289,11 +299,14 @@ def _render_approval_html(ctx: dict[str, Any], token: str) -> str:
 
 
 def _finalize_approved(db: Session, row: CheckoutSession) -> dict[str, Any]:
-    """Capture the payment and mark the session completed."""
-    payment_ids = fetch_order(row.razorpay_order_id).get("payments", [])
-    payment_id = payment_ids[0] if payment_ids else None
-    if payment_id:
-        capture_payment(payment_id=payment_id, amount_paise=row.total_paise)
+    """Approve a policy exception — release the hold so payment can proceed.
+
+    Approval happens BEFORE money moves. On approval we mark the order approved
+    and transition it to ``awaiting_payment`` (handing the buyer a payment link).
+    No capture happens here — the buyer still completes the Razorpay test
+    payment themselves.
+    """
+    items = json.loads(row.items) if row.items else []
 
     row.status = "approved"
     db.commit()
@@ -308,24 +321,39 @@ def _finalize_approved(db: Session, row: CheckoutSession) -> dict[str, Any]:
         result="success",
     )
 
-    row.status = "completed"
+    row.status = "awaiting_payment"
     db.commit()
 
     write_audit_row(
         db,
         actor="service",
-        action="checkout_completed",
+        action="payment_link_ready",
         entity_type="checkout_session",
         entity_id=row.session_id,
         payload={"razorpay_order_id": row.razorpay_order_id, "total_paise": row.total_paise},
         result="success",
     )
+
+    # Hand the buyer the payment link now that the exception is approved.
+    send_payment_link(
+        session_id=row.session_id,
+        checkout_url=f"{settings.service_url.rstrip('/')}/pay/{row.session_id}",
+        amount_paise=row.total_paise,
+        item_name=(items[0].get("name") if len(items) == 1 else None),
+    )
+
     return {
         "session_id": row.session_id,
-        "status": "completed",
+        "status": "awaiting_payment",
         "razorpay_order_id": row.razorpay_order_id,
-        "message": "Payment approved and captured",
+        "approval_url": _approval_view_url(row.session_id),
+        "message": "Purchase approved — proceed to payment",
     }
+
+
+def _approval_view_url(session_id: str) -> str:
+    """Best-effort URL back to the session's checkout page."""
+    return f"{settings.service_url.rstrip('/')}/pay/{session_id}"
 
 
 @router.post("/approval/{token}/approve")

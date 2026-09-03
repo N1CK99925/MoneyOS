@@ -1,13 +1,18 @@
 """Phase 4B — review-scoring metric, defined explicitly.
 
-Scoring Rule:
+Scoring Rule (documented intent):
     Pick the item with the highest average rating, provided it has
     ≥ 20 reviews. If no item meets the review threshold, fall back
     to the item with the most reviews. If no review data exists at
     all, return None (caller should use catalog-only fallback).
 
-This metric is deterministic and auditable — it can be explained
-to a judge in one sentence.
+Honesty note: the live web-search source (Tavily) does not return
+structured consumer-review data (rating / review count). Its ``score``
+is a relevance score, not a rating, so we deliberately do not pass it
+off as one. Because of that, `score_items` will typically return None
+and the caller falls back to the cheapest match — which is the honest,
+explainable behavior for this fixture catalog. If a review-capable
+source is wired up later, it must populate real `rating`/`review_count`.
 """
 
 from __future__ import annotations

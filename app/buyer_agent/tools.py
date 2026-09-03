@@ -64,16 +64,20 @@ def _get(path: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def search_catalog(query: str) -> str:
-    """Search the merchant catalog for products matching a query."""
+    """Search the merchant catalog for products matching a query.
+
+    Returns an empty matches list when nothing matches — never the whole
+    catalog. The agent must not buy something the user didn't ask for.
+    """
     data = _get("/api/catalog")
     products = data.get("products", [])
     query_lower = query.lower()
+    tokens = [t for t in query_lower.split() if len(t) > 2]
     matches = [
         p for p in products
-        if query_lower in p["name"].lower() or query_lower in p.get("description", "").lower()
+        if (query_lower in p["name"].lower() or query_lower in p.get("description", "").lower())
+        or any(t in p["name"].lower() or t in p.get("description", "").lower() for t in tokens)
     ]
-    if not matches:
-        matches = products  # return everything if no match
     return json.dumps({"matches": matches, "total": len(matches)})
 
 
@@ -171,10 +175,11 @@ _CATALOG_CHECKOUT_DEFINITIONS: list[dict[str, Any]] = [
         "function": {
             "name": "complete_checkout",
             "description": (
-                "Verify payment and start the human approval flow. The order must "
-                "be PAID on Razorpay before calling this (use get_payment_link or "
-                "pay_with_test_card first). If the result has status "
-                "'pending_approval', STOP and report the approval_url to the user."
+                "Verify payment and finalize the checkout. The order must already "
+                "be PAID on Razorpay (use get_payment_link or pay_with_test_card "
+                "first). Returns status 'awaiting_payment' or 'completed'. Note: "
+                "an over-budget order may require human approval before payment "
+                "is released — approve it first via the approval_url."
             ),
             "parameters": {
                 "type": "object",

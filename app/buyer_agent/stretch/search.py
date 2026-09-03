@@ -17,8 +17,11 @@ TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 def tavily_search(query: str, *, count: int = 5) -> list[dict[str, Any]]:
     """Search the web using Tavily Search API.
 
-    Returns a list of result dicts with keys: title, url, snippet, rating, review_count.
-    Only web results are returned (no news, images, etc.).
+    Returns a list of result dicts with keys: title, url, snippet.
+    Tavily does not return structured user-review data (rating / review
+    count), so we do NOT fabricate a 'rating' from its relevance ``score`` —
+    those are relevance scores, not consumer ratings. Callers that need review
+    data must obtain it from a source that actually provides it.
     """
     api_key = settings.tavily_api_key
     if not api_key:
@@ -52,8 +55,6 @@ def tavily_search(query: str, *, count: int = 5) -> list[dict[str, Any]]:
             "title": r.get("title", ""),
             "url": r.get("url", ""),
             "snippet": r.get("content", ""),
-            "rating": r.get("score"),
-            "review_count": None,
         }
         for r in web_results
     ]

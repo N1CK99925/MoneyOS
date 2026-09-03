@@ -52,7 +52,7 @@ class TestCheckoutSession:
         data = resp.json()
         assert data["session_id"] == "order_test123"
         assert data["total_paise"] == 35000
-        assert data["status"] == "ready_for_payment"
+        assert data["status"] == "awaiting_payment"
 
     def test_create_session_validates_items(self, client):
         resp = client.post(
@@ -89,20 +89,17 @@ class TestCheckoutSession:
 class TestCompleteCheckout:
     """POST /api/checkout_sessions/{id}/complete — verify payment."""
 
-    @patch("service.api.checkout.fetch_payment")
     @patch("service.api.checkout.fetch_order")
     @patch("service.api.checkout.create_order")
-    def test_complete_success(self, mock_create, mock_fetch_order, mock_fetch_payment, client):
-        _create_session(client, mock_create)
+    def test_complete_success(self, mock_create, mock_fetch_order, client):
+        _create_session(client, mock_create, order_id="order_test123")
         mock_fetch_order.return_value = {"status": "paid", "payments": ["pay_abc"]}
-        mock_fetch_payment.return_value = {"id": "pay_abc", "status": "captured"}
 
         resp = client.post("/api/checkout_sessions/order_test123/complete")
         assert resp.status_code == 200
         data = resp.json()
-        # Gated payments: complete now enters a human approval hold, not immediate completion.
-        assert data["status"] == "pending_approval"
-        assert "/api/approval/" in data["approval_url"]
+        # Within-budget payment completes directly — no post-payment approval.
+        assert data["status"] == "completed"
 
     @patch("service.api.checkout.fetch_order")
     @patch("service.api.checkout.create_order")
@@ -142,10 +139,11 @@ class TestCompleteCheckout:
 
 
 class TestCancelCheckout:
-    """POST /api/checkout_sessions/{id}/cancel — cancel a session."""
+    """POST /api/checkout_sessions/{id}/cancel — cancel a session + underlying order."""
 
+    @patch("service.api.checkout.cancel_order")
     @patch("service.api.checkout.create_order")
-    def test_cancel_success(self, mock_create_order, client):
+    def test_cancel_success(self, mock_create_order, mock_cancel_order, client):
         _create_session(client, mock_create_order, order_id="order_cancel_me")
 
         resp = client.post("/api/checkout_sessions/order_cancel_me/cancel")
@@ -153,6 +151,8 @@ class TestCancelCheckout:
         data = resp.json()
         assert data["status"] == "canceled"
         assert "canceled" in data["message"].lower()
+        # Underlying Razorpay order is also cancelled.
+        mock_cancel_order.assert_called_once_with("order_cancel_me")
 
     def test_cancel_session_not_found(self, client):
         resp = client.post("/api/checkout_sessions/nonexistent/cancel")

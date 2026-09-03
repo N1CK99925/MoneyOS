@@ -163,11 +163,11 @@ def edit_approval_result(
         return False
 
     if outcome == "approved":
-        text = "✅ Approved & captured.\nPayment captured on Razorpay."
+        text = "✅ Approved.\nPayment link released — buyer can now pay."
     elif outcome == "denied":
         text = "❌ Denied.\nOrder cancelled, nothing captured."
     elif outcome == "expired":
-        text = "⏱️ Expired.\nApproval TTL passed, no payment captured."
+        text = "⏱️ Expired.\nApproval TTL passed, order cancelled, no payment."
     else:
         text = f"⚠️ {detail or 'Could not process the action.'}"
 

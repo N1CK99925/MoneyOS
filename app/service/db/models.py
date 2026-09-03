@@ -44,7 +44,7 @@ class CheckoutSession(Base):
     items: Mapped[str] = mapped_column(Text, nullable=False)  # JSON string
     total_paise: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="INR")
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default="ready_for_payment")
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="created")
     buyer_agent_id: Mapped[str] = mapped_column(String(100), nullable=False, default="anonymous")
     created_at: Mapped[str] = mapped_column(String(35), nullable=False)
 
