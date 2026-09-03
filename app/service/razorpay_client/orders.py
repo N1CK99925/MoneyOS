@@ -14,6 +14,14 @@ def create_order(*, amount_paise: int, currency: str = "INR", receipt: str) -> d
     """Create a Razorpay order in test mode.
 
     Returns the full order dict from the Razorpay API.
+
+    Note on ``payment_capture: 1`` (auto-capture): the authorisation boundary is
+    an *application-level* gate, not a provider-level hold. MoneyOS decides
+    whether a checkout may be exposed for payment (within budget, or an approved
+    over-budget exception) and only hands over a payment link once that holds.
+    Razorpay merely executes the resulting payment. Since the approve-before-pay
+    gate runs before any payment link exists, auto-capture leaves no window where
+    money is held awaiting approval.
     """
     client = get_razorpay_client()
     return client.order.create(
@@ -21,7 +29,7 @@ def create_order(*, amount_paise: int, currency: str = "INR", receipt: str) -> d
             "amount": amount_paise,
             "currency": currency,
             "receipt": receipt,
-            "payment_capture": 1,  # auto-capture
+            "payment_capture": 1,  # auto-capture — app-level gate precedes exposure
         }
     )
 

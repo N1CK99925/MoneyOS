@@ -46,7 +46,7 @@ def _update_session_status(db: Session, order_id: str, status: str) -> None:
         # Only release to completed from a payable state. A `pending_approval`
         # session can NOT be completed by the webhook — MoneyOS is the only
         # authority over approval, so the external event cannot bypass it.
-        if row.status not in ("awaiting_payment", "approved"):
+        if row.status not in ("awaiting_payment",):
             logger.info(
                 "Ignoring captured event for order %s in status %s (not payable)",
                 order_id,

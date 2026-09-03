@@ -43,8 +43,16 @@ Human approval is reserved for **policy exceptions** (over-budget orders). Withi
 Three rules anchor the design:
 
 1. **The buyer agent never authorizes capture.** Within budget, the spend policy is the authority; over budget, a human must approve the exception before the buyer is even handed a payment link.
-2. **Human approval precedes, not follows, payment.** It gates entry to the payable state for exceptions — there is no "pay → then approve → then capture" in the loop.
+2. **Human approval precedes, not follows, payment.** It gates entry to the payable state for exceptions — there is no "pay → then approve → then capture" in the loop. Approval is recorded as an audit event (`approval_granted`), not as a persistent state: the decision belongs in the audit trail, and the session moves straight `pending_approval → awaiting_payment`.
 3. **Every money mutation writes an audit row** (HMAC-SHA256 signed, append-only).
+
+### Where the payment boundary lives
+
+The authorization boundary is **application-level, not provider-level.** MoneyOS decides whether a checkout may be exposed for payment (within budget, or an approved over-budget exception) and only hands over a Razorpay payment link once that holds. Razorpay test orders use auto-capture (`payment_capture: 1`) purely to execute the resulting payment. So the honest claim is:
+
+> **MoneyOS decides whether the checkout is allowed to proceed; Razorpay executes the resulting payment.**
+
+There is no provider-level authorization hold — but because the approve-before-pay gate runs before any payment link exists, no window exists where money is held awaiting approval.
 
 ---
 

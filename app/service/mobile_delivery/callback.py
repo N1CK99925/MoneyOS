@@ -51,7 +51,7 @@ class CallbackHandler:
 
         # Map the HTTP status to a card outcome.
         outcome: str
-        approved_statuses = ("awaiting_payment", "approved", "completed")
+        approved_statuses = ("awaiting_payment", "completed")
         if status_code == 200 and body.get("status") in approved_statuses:
             outcome = "approved"
         elif status_code == 200 and body.get("status") == "denied":

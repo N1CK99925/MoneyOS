@@ -24,7 +24,7 @@ from ..settings import settings
 router = APIRouter(prefix="/api", tags=["approval"])
 
 # Statuses that terminate an approval — no further action allowed.
-_TERMINAL = {"approved", "denied", "expired_approval", "completed", "canceled", "failed", "awaiting_payment"}
+_TERMINAL = {"denied", "expired_approval", "completed", "canceled", "failed", "awaiting_payment"}
 
 
 def mint_approval_token() -> str:
@@ -301,23 +301,34 @@ def _render_approval_html(ctx: dict[str, Any], token: str) -> str:
 def _finalize_approved(db: Session, row: CheckoutSession) -> dict[str, Any]:
     """Approve a policy exception — release the hold so payment can proceed.
 
-    Approval happens BEFORE money moves. On approval we mark the order approved
-    and transition it to ``awaiting_payment`` (handing the buyer a payment link).
-    No capture happens here — the buyer still completes the Razorpay test
-    payment themselves.
+    Approval happens BEFORE money moves. On approval the order transitions
+    directly from ``pending_approval`` to ``awaiting_payment`` (handing the
+    buyer a payment link). No capture happens here — the buyer still completes
+    the Razorpay test payment themselves. Approval is recorded as an audit
+    event (``approval_granted``), not as a persistent state: it is a decision,
+    not a status the buyer can act on.
     """
     items = json.loads(row.items) if row.items else []
 
-    row.status = "approved"
-    db.commit()
-
+    # The authorization is scoped to this exact order so the audit record
+    # shows precisely what was approved, against which policy ceiling, before
+    # the buyer is allowed to pay.
     write_audit_row(
         db,
         actor="human_approval",
         action="approval_granted",
         entity_type="checkout_session",
         entity_id=row.session_id,
-        payload={"razorpay_order_id": row.razorpay_order_id, "total_paise": row.total_paise},
+        payload={
+            "razorpay_order_id": row.razorpay_order_id,
+            "total_paise": row.total_paise,
+            "currency": row.currency,
+            "items": [
+                {"id": it.get("id"), "name": it.get("name"), "quantity": it.get("quantity"), "unit_price_paise": it.get("price_paise")}
+                for it in items
+            ],
+            "policy_limit_paise": settings.spend_policy_max_per_transaction_paise,
+        },
         result="success",
     )
 
@@ -358,7 +369,7 @@ def _approval_view_url(session_id: str) -> str:
 
 @router.post("/approval/{token}/approve")
 def approve(token: str, db: Session = Depends(get_db)):
-    """Approve a pending checkout — capture the payment."""
+    """Approve a pending checkout exception — release the payment link (no capture)."""
     try:
         row = _resolve_token(db, token)
     except HTTPException:
