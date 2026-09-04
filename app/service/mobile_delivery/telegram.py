@@ -99,6 +99,33 @@ def send_payment_link(
     return bool(_post("sendMessage", chat_id=chat_id, text=text))
 
 
+def send_purchase_confirmation(
+    *,
+    session_id: str,
+    items: list[dict[str, Any]] | None = None,
+    total_paise: int = 0,
+) -> bool:
+    """Notify the merchant that a purchase has been completed.
+
+    Returns True if the message was sent, False otherwise.
+    """
+    chat_id = _resolve_chat_id("approval")
+    if not _enabled(chat_id):
+        return False
+
+    lines = ["✅ MoneyOS — purchase confirmed\n"]
+    if items:
+        for it in items:
+            qty = it.get("quantity", 1)
+            name = it.get("name", it.get("id", "item"))
+            lines.append(f"• {qty} × {name}")
+    if total_paise:
+        lines.append(f"\nTotal: ₹{total_paise / 100:,.2f}")
+    lines.append(f"\nSession: {session_id}")
+
+    return bool(_post("sendMessage", chat_id=chat_id, text="\n".join(lines)))
+
+
 def send_approval_card(
     *,
     session_id: str,

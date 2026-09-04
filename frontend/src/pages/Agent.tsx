@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Lightning, X, PaperPlaneRight } from 'phosphor-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { streamAgentRun } from '../lib/api'
 import type { AgentMessage, AgentMessageType } from '../types'
 import { useGoal, useScrollReveal } from '../hooks'
@@ -173,7 +175,9 @@ export default function Agent() {
                         : 'bg-white border border-border-faint text-ink-soft rounded-bl-md'
                   }`}
                 >
-                  {msg.content || (
+                  {msg.content ? (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  ) : (
                     <span className="inline-flex items-center gap-1.5 text-ink-muted">
                       <span className="w-1.5 h-1.5 rounded-full bg-sage animate-pulse" />
                       Thinking...

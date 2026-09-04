@@ -3,17 +3,28 @@ import { Link } from 'react-router-dom'
 import { ArrowRight } from 'phosphor-react'
 import { useScrollReveal } from '../../hooks'
 import { fetchCatalog } from '../../lib/api'
-import type { CatalogItem } from '../../types'
+import type { CatalogItem, CatalogCategory } from '../../types'
 
 export default function CatalogPreview() {
   const headerRef = useScrollReveal()
   const gridRef = useScrollReveal(0.05)
-  const [items, setItems] = useState<CatalogItem[]>([])
+  const [featured, setFeatured] = useState<CatalogItem[]>([])
 
   useEffect(() => {
+    const pick = (group: CatalogCategory[]): CatalogItem[] => {
+      // One item per zone so the preview shows the breadth of the catalog.
+      const perZone = group
+        .filter((z) => z.products.length > 0)
+        .map((z) => z.products[0])
+      return perZone.slice(0, 4)
+    }
+
     fetchCatalog()
-      .then(setItems)
-      .catch(() => setItems([]))
+      .then((data) => {
+        if (data.categories?.length) setFeatured(pick(data.categories))
+        else setFeatured((data.products ?? []).slice(0, 4))
+      })
+      .catch(() => setFeatured([]))
   }, [])
 
   return (
@@ -55,7 +66,7 @@ export default function CatalogPreview() {
           ref={gridRef}
           className="reveal grid grid-cols-1 md:grid-cols-12 gap-4"
         >
-          {items.slice(0, 4).map((item, i) => {
+          {featured.map((item, i) => {
             const span =
               i === 0 ? 'md:col-span-7 md:row-span-2' :
               i === 1 ? 'md:col-span-5' :

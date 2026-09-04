@@ -1,5 +1,7 @@
 """Centralised application settings — loaded from env / .env via Pydantic."""
 
+import os
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -39,6 +41,12 @@ class Settings(BaseSettings):
         default="groq/llama-3.3-70b-versatile,gemini/gemini-2.0-flash",
         description="Comma-separated fallback models if primary fails",
     )
+    # Extra API key slots. Each pair of (model, key) gets routed through litellm.
+    # litellm picks a provider by the model's prefix and reads that provider's
+    # env var, so slot these onto the env vars for the providers you actually use.
+    llm_api_key_1: str = Field(default="", description="API key slot 1")
+    llm_api_key_2: str = Field(default="", description="API key slot 2")
+    llm_api_key_3: str = Field(default="", description="API key slot 3")
     llm_max_iterations: int = Field(
         default=10,
         description="Max tool-calling iterations before the agent gives up",
@@ -83,3 +91,28 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def _set_key(env_var: str, key: str) -> None:
+    """Set a provider env var for litellm, without overwriting an earlier value."""
+    if key:
+        os.environ.setdefault(env_var, key)
+
+
+# Expose API keys to litellm (which reads provider-specific env vars chosen by
+# the model's prefix). Each key slot maps onto the providers you might use. A
+# slot's key intentionally does NOT cascade to other providers, so each fallback
+# uses its own real key/quota. Slots fall back to the shared ``llm_api_key``.
+if settings.llm_api_key:
+    os.environ.setdefault("GROQ_API_KEY", settings.llm_api_key)
+    os.environ.setdefault("OPENAI_API_KEY", settings.llm_api_key)
+    os.environ.setdefault("OPENROUTER_API_KEY", settings.llm_api_key)
+    os.environ.setdefault("GEMINI_API_KEY", settings.llm_api_key)
+
+# Key slot 1 -> Groq
+_set_key("GROQ_API_KEY", settings.llm_api_key_1)
+# Key slot 2 -> OpenRouter (routes to many models; point fallbacks here)
+_set_key("OPENROUTER_API_KEY", settings.llm_api_key_2)
+# Key slot 3 -> OpenAI / Gemini
+_set_key("OPENAI_API_KEY", settings.llm_api_key_3)
+_set_key("GEMINI_API_KEY", settings.llm_api_key_3)

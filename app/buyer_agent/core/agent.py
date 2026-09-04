@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from collections.abc import Callable
 from typing import Any
@@ -20,18 +19,20 @@ logger = logging.getLogger(__name__)
 # Suppress noisy litellm logs
 logging.getLogger("litellm").setLevel(logging.WARNING)
 
-# Set API key for litellm (reads from env var, litellm uses provider-specific env vars)
-if settings.llm_api_key:
-    # Set the key for all common providers so fallbacks work
-    os.environ.setdefault("OPENAI_API_KEY", settings.llm_api_key)
-    os.environ.setdefault("OPENROUTER_API_KEY", settings.llm_api_key)
-    os.environ.setdefault("GROQ_API_KEY", settings.llm_api_key)
-    os.environ.setdefault("GEMINI_API_KEY", settings.llm_api_key)
+# Set per-provider API keys for litellm — done centrally in service.settings,
+# so every agent (core, stretch, CLI) gets distinct keys per provider.
 
 # Global rate-limit cooldown: timestamp after which we can retry
 _rate_limit_cooldown_until: float = 0.0
 _RATE_LIMIT_BACKOFF = 30  # seconds to wait after hitting rate limit
 _RETRY_DELAY = 3  # seconds between model retries
+
+# Token-aware pacing: track tokens used in a rolling window to stay under the
+# provider's per-minute budget instead of blowing through it and getting 429s.
+# (Groq free tier is ~8000 TPM; keep well under it with headroom.)
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_TOKEN_BUDGET = 7000  # tokens allowed per rolling window (headroom under 8000)
+_token_history: list[tuple[float, int]] = []  # (timestamp, tokens_used)
 
 _SYSTEM_PROMPT = """\
 You are an autonomous buyer agent. Your job is to find and purchase a product \
@@ -56,6 +57,7 @@ Payment flow (IMPORTANT):
 - If you call `complete_checkout` before payment, it will return a 400 error.
 
 Rules:
+- ONLY handle product research and purchasing. If the user asks something unrelated (e.g. coding, math, general knowledge), politely refuse and redirect them to the task at hand.
 - Always search the catalog first — never guess product IDs.
 - Only buy ONE item unless the user explicitly asks for multiple.
 - If nothing matches, say so clearly — do not buy the wrong thing.
@@ -65,6 +67,44 @@ Rules:
 
 # Type for the streaming callback: (event_type, data)
 EventCallback = Callable[[str, dict[str, Any]], None]
+
+
+def _pace_request(estimated_tokens: int, on_event: EventCallback | None) -> None:
+    """Sleep as needed so rolling token usage stays under the per-minute budget.
+
+    Called before each LLM request. Looks at tokens consumed in the last
+    ``_RATE_LIMIT_WINDOW`` seconds and, if adding ``estimated_tokens`` would
+    exceed ``_RATE_LIMIT_TOKEN_BUDGET``, waits until enough budget frees up.
+    """
+    now = time.time()
+
+    # Drop entries older than the window
+    while _token_history and _token_history[0][0] < now - _RATE_LIMIT_WINDOW:
+        _token_history.pop(0)
+
+    used = sum(t for _, t in _token_history)
+    if used + estimated_tokens > _RATE_LIMIT_TOKEN_BUDGET:
+        wait = _RATE_LIMIT_WINDOW - (now - _token_history[0][0]) if _token_history else 1.0
+        wait = max(wait, 1.0)
+        logger.info("Token budget hit (%d/%d) — pacing %.1fs", used, _RATE_LIMIT_TOKEN_BUDGET, wait)
+        if on_event:
+            on_event("rate_limit_wait", {"seconds": int(wait), "reason": "token_pacing"})
+        time.sleep(wait)
+        # Drop the now-expired window again so we don't double-count
+        while _token_history and _token_history[0][0] < time.time() - _RATE_LIMIT_WINDOW:
+            _token_history.pop(0)
+
+
+def _record_tokens(usage) -> None:
+    """Record tokens from a litellm response into the rolling window."""
+    if usage is None:
+        return
+    # Count input + output + cache tokens; fall back to total_tokens if present.
+    total = getattr(usage, "total_tokens", 0) or 0
+    if total == 0:
+        total = (getattr(usage, "prompt_tokens", 0) or 0) + (getattr(usage, "completion_tokens", 0) or 0)
+    if total > 0:
+        _token_history.append((time.time(), total))
 
 
 def _build_models() -> list[str]:
@@ -209,17 +249,21 @@ def _run_loop(
         logger.info("Iteration %d/%d", iteration, max_iter)
 
         try:
+            _pace_request(estimated_tokens=2000, on_event=on_event)
+            # No explicit api_key here: litellm resolves the key per provider
+            # from the env vars set above, so each fallback uses its own key.
             response = litellm.completion(
                 model=model,
                 messages=messages,
                 tools=TOOL_DEFINITIONS,
                 tool_choice="auto",
-                api_key=settings.llm_api_key or None,
             )
         except Exception as e:
             error_msg = f"LLM call failed on {model}: {e}"
             logger.warning(error_msg)
             raise RuntimeError(error_msg) from e
+
+        _record_tokens(response.usage)
 
         message = response.choices[0].message
 

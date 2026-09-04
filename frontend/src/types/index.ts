@@ -5,6 +5,19 @@ export interface CatalogItem {
   price_inr: number
   description?: string
   image?: string
+  category?: string
+}
+
+export interface CatalogCategory {
+  name: string
+  products: CatalogItem[]
+}
+
+export interface Catalog {
+  merchant: string
+  currency: string
+  products: CatalogItem[]
+  categories?: CatalogCategory[]
 }
 
 export interface CheckoutSession {

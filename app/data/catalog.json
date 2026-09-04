@@ -4,6 +4,7 @@
     "name": "Chicken Biriyani",
     "price_paise": 35000,
     "currency": "INR",
+    "category": "Food",
     "description": "Hyderabadi style, full portion with raita"
   },
   {
@@ -11,6 +12,7 @@
     "name": "Veg Thali",
     "price_paise": 25000,
     "currency": "INR",
+    "category": "Food",
     "description": "Paneer, dal, rice, roti, salad, gulab jamun"
   },
   {
@@ -18,6 +20,7 @@
     "name": "Masala Dosa",
     "price_paise": 15000,
     "currency": "INR",
+    "category": "Food",
     "description": "Crispy dosa with potato filling, sambar, chutney"
   },
   {
@@ -25,6 +28,7 @@
     "name": "Egg Fried Rice",
     "price_paise": 18000,
     "currency": "INR",
+    "category": "Food",
     "description": "Wok-tossed with vegetables and soy sauce"
   },
   {
@@ -32,6 +36,7 @@
     "name": "Paneer Tikka",
     "price_paise": 28000,
     "currency": "INR",
+    "category": "Food",
     "description": "Grilled cottage cheese cubes with mint chutney"
   },
   {
@@ -39,6 +44,7 @@
     "name": "Butter Chicken",
     "price_paise": 38000,
     "currency": "INR",
+    "category": "Food",
     "description": "Creamy tomato gravy, tender chicken, naan included"
   },
   {
@@ -46,6 +52,7 @@
     "name": "Idli Sambar",
     "price_paise": 12000,
     "currency": "INR",
+    "category": "Food",
     "description": "4 soft idlis with sambar and coconut chutney"
   },
   {
@@ -53,6 +60,7 @@
     "name": "Mutton Biryani",
     "price_paise": 45000,
     "currency": "INR",
+    "category": "Food",
     "description": "Lucknowi style, slow-cooked mutton, saffron rice"
   },
   {
@@ -60,6 +68,7 @@
     "name": "Chai + Samosa",
     "price_paise": 8000,
     "currency": "INR",
+    "category": "Food",
     "description": "Masala chai with 2 vegetable samosas"
   },
   {
@@ -67,6 +76,239 @@
     "name": "Gulab Jamun (4 pcs)",
     "price_paise": 10000,
     "currency": "INR",
+    "category": "Food",
     "description": "Warm milk-solid dumplings in cardamom syrup"
+  },
+  {
+    "id": "item_011",
+    "name": "Chole Bhature",
+    "price_paise": 16000,
+    "currency": "INR",
+    "category": "Food",
+    "description": "Spicy chickpea curry with 2 fluffy bhature"
+  },
+  {
+    "id": "item_012",
+    "name": "Hakka Noodles",
+    "price_paise": 17000,
+    "currency": "INR",
+    "category": "Food",
+    "description": "Indo-Chinese stir-fried noodles with vegetables"
+  },
+  {
+    "id": "item_013",
+    "name": "Fish Curry + Rice",
+    "price_paise": 32000,
+    "currency": "INR",
+    "category": "Food",
+    "description": "Goan fish curry with steamed rice"
+  },
+  {
+    "id": "item_014",
+    "name": "Veg Pulao + Raita",
+    "price_paise": 20000,
+    "currency": "INR",
+    "category": "Food",
+    "description": "Fragrant basmati pulao with cucumber raita"
+  },
+  {
+    "id": "item_015",
+    "name": "Masala Chai (1L)",
+    "price_paise": 6000,
+    "currency": "INR",
+    "category": "Food",
+    "description": "Hot spiced milk tea, enough for 4 cups"
+  },
+  {
+    "id": "item_016",
+    "name": "Brownie with Ice Cream",
+    "price_paise": 13000,
+    "currency": "INR",
+    "category": "Food",
+    "description": "Warm fudge brownie with a scoop of vanilla"
+  },
+  {
+    "id": "item_017",
+    "name": "Fresh Lime Soda",
+    "price_paise": 7000,
+    "currency": "INR",
+    "category": "Food",
+    "description": "Chilled sweet-and-salty lime soda"
+  },
+  {
+    "id": "item_018",
+    "name": "Mixed Fruit Bowl",
+    "price_paise": 15000,
+    "currency": "INR",
+    "category": "Food",
+    "description": "Seasonal cut fruits with mint and chaat masala"
+  },
+  {
+    "id": "item_101",
+    "name": "Wireless Earbuds",
+    "price_paise": 129900,
+    "currency": "INR",
+    "category": "Electronics",
+    "description": "True wireless earbuds with charging case, 24h battery, IPX4"
+  },
+  {
+    "id": "item_102",
+    "name": "Smart Watch",
+    "price_paise": 299900,
+    "currency": "INR",
+    "category": "Electronics",
+    "description": "AMOLED display, heart-rate + SpO2, 7-day battery life"
+  },
+  {
+    "id": "item_103",
+    "name": "20W USB-C Charger",
+    "price_paise": 19900,
+    "currency": "INR",
+    "category": "Electronics",
+    "description": "Fast compact wall charger for phones and tablets"
+  },
+  {
+    "id": "item_104",
+    "name": "10000mAh Power Bank",
+    "price_paise": 149900,
+    "currency": "INR",
+    "category": "Electronics",
+    "description": "Pocket-friendly fast-charging power bank, USB-C + USB-A"
+  },
+  {
+    "id": "item_105",
+    "name": "Bluetooth Speaker",
+    "price_paise": 249900,
+    "currency": "INR",
+    "category": "Electronics",
+    "description": "Portable 10W speaker with deep bass, waterproof"
+  },
+  {
+    "id": "item_106",
+    "name": "Wired Gaming Mouse",
+    "price_paise": 99900,
+    "currency": "INR",
+    "category": "Electronics",
+    "description": "7200 DPI optical sensor with RGB lighting"
+  },
+  {
+    "id": "item_107",
+    "name": "USB-C Cable (1.5m)",
+    "price_paise": 49900,
+    "currency": "INR",
+    "category": "Electronics",
+    "description": "Braided fast-charging data cable"
+  },
+  {
+    "id": "item_201",
+    "name": "Amul Milk 1L",
+    "price_paise": 6200,
+    "currency": "INR",
+    "category": "Groceries",
+    "description": "Full-cream pasteurised milk, tetra pack"
+  },
+  {
+    "id": "item_202",
+    "name": "Brown Bread 400g",
+    "price_paise": 4500,
+    "currency": "INR",
+    "category": "Groceries",
+    "description": "Whole-wheat soft bread loaf"
+  },
+  {
+    "id": "item_203",
+    "name": "Eggs (12 pack)",
+    "price_paise": 9000,
+    "currency": "INR",
+    "category": "Groceries",
+    "description": "Farm-fresh brown eggs, tray of 12"
+  },
+  {
+    "id": "item_204",
+    "name": "Basmati Rice 5kg",
+    "price_paise": 54900,
+    "currency": "INR",
+    "category": "Groceries",
+    "description": "Aged long-grain basmati rice bag"
+  },
+  {
+    "id": "item_205",
+    "name": "Sunflower Oil 1L",
+    "price_paise": 14900,
+    "currency": "INR",
+    "category": "Groceries",
+    "description": "Refined cooking oil bottle"
+  },
+  {
+    "id": "item_206",
+    "name": "Atta 5kg",
+    "price_paise": 32900,
+    "currency": "INR",
+    "category": "Groceries",
+    "description": "Chakki fresh whole-wheat flour"
+  },
+  {
+    "id": "item_207",
+    "name": "Toilet Paper (6 rolls)",
+    "price_paise": 29900,
+    "currency": "INR",
+    "category": "Groceries",
+    "description": "Soft 2-ply 3-layer toilet rolls"
+  },
+  {
+    "id": "item_208",
+    "name": "Liquid Dishwash 1L",
+    "price_paise": 19900,
+    "currency": "INR",
+    "category": "Groceries",
+    "description": "Lemon-scented dishwashing liquid"
+  },
+  {
+    "id": "item_301",
+    "name": "Notebook (300 pages)",
+    "price_paise": 9900,
+    "currency": "INR",
+    "category": "Stationery",
+    "description": "Hardcover 300-page ruled notebook, A5"
+  },
+  {
+    "id": "item_302",
+    "name": "Gel Pen Set (5)",
+    "price_paise": 14900,
+    "currency": "INR",
+    "category": "Stationery",
+    "description": "Smooth-writing 0.5mm gel pens in assorted colours"
+  },
+  {
+    "id": "item_303",
+    "name": "A4 Paper Ream (500)",
+    "price_paise": 29900,
+    "currency": "INR",
+    "category": "Stationery",
+    "description": "Bright white 70 GSM copier paper"
+  },
+  {
+    "id": "item_304",
+    "name": "Sticky Notes (12 pads)",
+    "price_paise": 12900,
+    "currency": "INR",
+    "category": "Stationery",
+    "description": "Assorted neon sticky notes for reminders"
+  },
+  {
+    "id": "item_305",
+    "name": "Office Scissors",
+    "price_paise": 19900,
+    "currency": "INR",
+    "category": "Stationery",
+    "description": "Stainless-steel scissors with soft-grip handle"
+  },
+  {
+    "id": "item_306",
+    "name": "Duct Tape Roll",
+    "price_paise": 15900,
+    "currency": "INR",
+    "category": "Stationery",
+    "description": "Heavy-duty grey duct tape, 48mm x 30m"
   }
 ]

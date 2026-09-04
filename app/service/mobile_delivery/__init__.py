@@ -6,6 +6,7 @@ from .telegram import (
     resolve_approval_path,
     send_approval_card,
     send_payment_link,
+    send_purchase_confirmation,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "resolve_approval_path",
     "send_approval_card",
     "send_payment_link",
+    "send_purchase_confirmation",
 ]

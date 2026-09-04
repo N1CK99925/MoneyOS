@@ -53,6 +53,7 @@ Payment flow (IMPORTANT):
 - If you call `complete_checkout` before payment, it will return a 400 error.
 
 Rules:
+- ONLY handle product research and purchasing. If the user asks something unrelated (e.g. coding, math, general knowledge), politely refuse and redirect them to the task at hand.
 - Always search the catalog first — never guess product IDs.
 - Use web search to find real reviews and ratings for items.
 - Only buy ONE item unless the user explicitly asks for multiple.
@@ -242,12 +243,13 @@ def _run_loop(
         logger.info("Iteration %d/%d", iteration, max_iter)
 
         try:
+            # No explicit api_key: litellm resolves the key per provider from
+            # the env vars set in service.settings, so each fallback uses its own key.
             response = litellm.completion(
                 model=model,
                 messages=messages,
                 tools=STRETCH_TOOL_DEFINITIONS,
                 tool_choice="auto",
-                api_key=settings.llm_api_key or None,
             )
         except Exception as e:
             error_msg = f"LLM call failed on {model}: {e}"

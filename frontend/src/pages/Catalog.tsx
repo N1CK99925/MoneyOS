@@ -2,14 +2,23 @@ import { useEffect, useState, useMemo } from 'react'
 import { ShoppingCart, Plus, Minus, Trash, MagnifyingGlass } from 'phosphor-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fetchCatalog, createCheckoutSession, getRazorpayKey, loadRazorpayScript, completeCheckout, cancelCheckout, failCheckout } from '../lib/api'
-import type { CatalogItem } from '../types'
+import type { CatalogItem, CatalogCategory } from '../types'
 import { useGoal } from '../hooks'
 import { GlassButton } from '../components/ui/glass-button'
 
 const EASE: [number, number, number, number] = [0.32, 0.72, 0, 1]
 
+const ZONE_META: Record<string, { tag: string; blurb: string }> = {
+  Food: { tag: 'Kitchen', blurb: 'Hot meals, snacks & drinks' },
+  Electronics: { tag: 'Gadgets', blurb: 'Devices & accessories' },
+  Groceries: { tag: 'Pantry', blurb: 'Daily essentials & staples' },
+  Stationery: { tag: 'Workdesk', blurb: 'Office & school supplies' },
+  Other: { tag: 'More', blurb: 'Everything else' },
+}
+
 export default function Catalog() {
   const [items, setItems] = useState<CatalogItem[]>([])
+  const [categories, setCategories] = useState<CatalogCategory[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [cart, setCart] = useState<Record<string, number>>({})
@@ -19,21 +28,39 @@ export default function Catalog() {
 
   useEffect(() => {
     fetchCatalog()
-      .then(setItems)
+      .then((data) => {
+        setItems(data.products ?? data)
+        setCategories(data.categories ?? null)
+      })
       .catch(() => setError('Failed to load catalog'))
       .finally(() => setLoading(false))
   }, [])
 
+  // Group into themed zones. Prefer the server-provided grouping, fall back to
+  // deriving zones from each item's category field.
+  const zones = useMemo<CatalogCategory[]>(() => {
+    if (categories) return categories
+    const map = new Map<string, CatalogItem[]>()
+    for (const it of items) {
+      const key = it.category || 'Other'
+      map.set(key, [...(map.get(key) ?? []), it])
+    }
+    return Array.from(map.entries()).map(([name, products]) => ({ name, products }))
+  }, [categories, items])
+
+  // When searching, show matching items flat across all zones.
+  const searching = search.trim().length > 0
   const filtered = useMemo(() => {
-    if (!search.trim()) return items
+    if (!searching) return []
     const q = search.toLowerCase()
     return items.filter(
       (i) =>
         i.name.toLowerCase().includes(q) ||
         (i.description ?? '').toLowerCase().includes(q) ||
+        (i.category ?? '').toLowerCase().includes(q) ||
         i.id.toLowerCase().includes(q),
     )
-  }, [items, search])
+  }, [searching, items, search])
 
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0)
   const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
@@ -111,6 +138,92 @@ export default function Catalog() {
     addItem(item)
   }
 
+  const renderGrid = (list: CatalogItem[]) => (
+    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+      {list.map((item, i) => {
+        const span =
+          i % 5 === 0 ? 'md:col-span-7' :
+          i % 5 === 1 ? 'md:col-span-5' :
+          i % 5 === 2 ? 'md:col-span-4' :
+          i % 5 === 3 ? 'md:col-span-4' :
+          'md:col-span-4'
+        const qty = cart[item.id] ?? 0
+
+        return (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE, delay: i * 0.05 }}
+            className={span}
+          >
+            <div className="group h-full rounded-[1.5rem] bg-cream-dark border border-border-faint p-1 transition-all duration-700 ease-spring hover:border-border-warm/60">
+              <div className="h-full rounded-[calc(1.5rem-4px)] bg-white border border-border-faint/50 p-6 inset-highlight flex flex-col justify-between min-h-[220px] transition-all duration-700 ease-spring group-hover:shadow-card-hover">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] text-ink-muted tracking-wider uppercase">{item.id}</span>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-sage">{item.category ?? ''}</span>
+                  </div>
+                  <h3 className="font-serif text-xl font-semibold text-ink mt-2 mb-2">{item.name}</h3>
+                  <p className="text-sm text-ink-muted leading-relaxed line-clamp-3">{item.description ?? ''}</p>
+                </div>
+                <div className="flex items-center justify-between mt-5">
+                  <span className="font-mono text-lg font-medium text-ink">
+                    ₹{Math.round(item.price_paise / 100)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {qty > 0 ? (
+                      <div className="flex items-center gap-1 rounded-full bg-parchment border border-border-faint px-1 py-1">
+                        <GlassButton
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => updateCart(item.id, -1)}
+                          className="!h-7 !w-7 !rounded-full"
+                        >
+                          {qty === 1 ? (
+                            <Trash weight="light" className="w-3 h-3 text-error" />
+                          ) : (
+                            <Minus weight="light" className="w-3 h-3 text-ink-soft" />
+                          )}
+                        </GlassButton>
+                        <span className="w-6 text-center font-mono text-xs font-medium text-ink">{qty}</span>
+                        <GlassButton
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => updateCart(item.id, 1)}
+                          className="!h-7 !w-7 !rounded-full"
+                        >
+                          <Plus weight="light" className="w-3 h-3 text-ink-soft" />
+                        </GlassButton>
+                      </div>
+                    ) : (
+                      <GlassButton
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => updateCart(item.id, 1)}
+                        className="!h-9 !w-9 !rounded-full"
+                      >
+                        <Plus weight="light" className="w-4 h-4" />
+                      </GlassButton>
+                    )}
+                    <GlassButton
+                      size="icon"
+                      onClick={() => handleAgentGoal(item)}
+                      className="!h-9 !w-9 !rounded-full"
+                      title="Ask agent to buy this"
+                    >
+                      <ShoppingCart weight="light" className="w-4 h-4" />
+                    </GlassButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )
+      })}
+    </div>
+  )
+
   if (loading) {
     return (
       <div className="min-h-[60dvh] flex items-center justify-center px-4">
@@ -136,7 +249,7 @@ export default function Catalog() {
             Catalog
           </h1>
           <p className="text-base text-ink-muted">
-            {items.length} products. Add to cart, or let the agent handle it.
+            {items.length} products across {zones.length} zones. Add to cart, or let the agent handle it.
           </p>
         </div>
 
@@ -158,87 +271,49 @@ export default function Catalog() {
           />
         </div>
 
-        {/* ── Product grid ── */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          {filtered.map((item, i) => {
-            const span =
-              i % 5 === 0 ? 'md:col-span-7' :
-              i % 5 === 1 ? 'md:col-span-5' :
-              i % 5 === 2 ? 'md:col-span-4' :
-              i % 5 === 3 ? 'md:col-span-4' :
-              'md:col-span-4'
-            const qty = cart[item.id] ?? 0
+        {/* ── Search results (flat) ── */}
+        {searching && (
+          <>
+            <p className="mb-6 text-sm text-ink-muted">
+              {filtered.length} result{filtered.length === 1 ? '' : 's'}
+            </p>
+            {filtered.length > 0 ? (
+              renderGrid(filtered)
+            ) : (
+              <div className="rounded-[1.5rem] bg-cream-dark border border-border-faint p-10 text-center text-sm text-ink-muted">
+                No products match “{search}”.
+              </div>
+            )}
+          </>
+        )}
 
+        {/* ── Themed zones ── */}
+        {!searching &&
+          zones.map((zone) => {
+            const meta = ZONE_META[zone.name] ?? ZONE_META.Other
+            const zoneId = `zone-${zone.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
             return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: EASE, delay: i * 0.05 }}
-                className={span}
-              >
-                <div className="group h-full rounded-[1.5rem] bg-cream-dark border border-border-faint p-1 transition-all duration-700 ease-spring hover:border-border-warm/60">
-                  <div className="h-full rounded-[calc(1.5rem-4px)] bg-white border border-border-faint/50 p-6 inset-highlight flex flex-col justify-between min-h-[220px] transition-all duration-700 ease-spring group-hover:shadow-card-hover">
-                    <div>
-                      <span className="font-mono text-[10px] text-ink-muted tracking-wider uppercase">{item.id}</span>
-                      <h3 className="font-serif text-xl font-semibold text-ink mt-2 mb-2">{item.name}</h3>
-                      <p className="text-sm text-ink-muted leading-relaxed line-clamp-3">{item.description ?? ''}</p>
-                    </div>
-                    <div className="flex items-center justify-between mt-5">
-                      <span className="font-mono text-lg font-medium text-ink">
-                        ₹{Math.round(item.price_paise / 100)}
+              <section key={zone.name} id={zoneId} className="mb-14 last:mb-0 scroll-mt-28">
+                <div className="flex items-end justify-between gap-4 mb-7">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="w-8 h-px bg-sage/50" />
+                      <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-sage">
+                        {meta.tag}
                       </span>
-                      <div className="flex items-center gap-2">
-                        {qty > 0 ? (
-                          <div className="flex items-center gap-1 rounded-full bg-parchment border border-border-faint px-1 py-1">
-                            <GlassButton
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => updateCart(item.id, -1)}
-                              className="!h-7 !w-7 !rounded-full"
-                            >
-                              {qty === 1 ? (
-                                <Trash weight="light" className="w-3 h-3 text-error" />
-                              ) : (
-                                <Minus weight="light" className="w-3 h-3 text-ink-soft" />
-                              )}
-                            </GlassButton>
-                            <span className="w-6 text-center font-mono text-xs font-medium text-ink">{qty}</span>
-                            <GlassButton
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => updateCart(item.id, 1)}
-                              className="!h-7 !w-7 !rounded-full"
-                            >
-                              <Plus weight="light" className="w-3 h-3 text-ink-soft" />
-                            </GlassButton>
-                          </div>
-                        ) : (
-                          <GlassButton
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => updateCart(item.id, 1)}
-                            className="!h-9 !w-9 !rounded-full"
-                          >
-                            <Plus weight="light" className="w-4 h-4" />
-                          </GlassButton>
-                        )}
-                        <GlassButton
-                          size="icon"
-                          onClick={() => handleAgentGoal(item)}
-                          className="!h-9 !w-9 !rounded-full"
-                          title="Ask agent to buy this"
-                        >
-                          <ShoppingCart weight="light" className="w-4 h-4" />
-                        </GlassButton>
-                      </div>
                     </div>
+                    <h2 className="font-serif text-2xl md:text-3xl font-semibold tracking-tight text-ink">
+                      {zone.name}
+                    </h2>
                   </div>
+                  <span className="font-mono text-xs text-ink-muted whitespace-nowrap">
+                    {meta.blurb} · {zone.products.length} item{zone.products.length === 1 ? '' : 's'}
+                  </span>
                 </div>
-              </motion.div>
+                {renderGrid(zone.products)}
+              </section>
             )
           })}
-        </div>
 
         {/* ── Cart bar ── */}
         <AnimatePresence>

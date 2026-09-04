@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db, write_audit_row
 from ..db.models import CheckoutSession as CheckoutSessionRow
-from ..mobile_delivery import send_payment_link
+from ..mobile_delivery import send_payment_link, send_purchase_confirmation
 from ..razorpay_client.orders import cancel_order, create_order, fetch_order, poll_order_status
 from ..razorpay_client.payments import fetch_payment
 from ..runtime_settings import get_spend_policy_max
@@ -312,6 +312,11 @@ def complete_checkout(
                 "amount_paise": session["total_paise"],
             },
             result="success",
+        )
+        send_purchase_confirmation(
+            session_id=session_id,
+            items=session.get("items"),
+            total_paise=session["total_paise"],
         )
         return {
             "session_id": session_id,
